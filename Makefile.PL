@@ -12,6 +12,9 @@ sub MY::postamble {
     if (defined $ENV{USER} && $ENV{USER} eq 'eserte' && $^O =~ /bsd/i && -f "../../perl.release.mk") {
 	$postamble .= <<'EOF';
 
+SF_PROJECT=	srezic
+SF_PACKAGE=	Win32Util
+
 .include "../../perl.release.mk"
 .include "../../perl.cvs.mk"
 
