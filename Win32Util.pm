@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 #
-# $Id: Win32Util.pm,v 1.8 1999/08/06 07:59:38 eserte Exp $
+# $Id: Win32Util.pm,v 1.9 1999/12/18 14:35:55 eserte Exp $
 # Author: Slaven Rezic
 #
 # Copyright (C) 1999 Slaven Rezic. All rights reserved.
@@ -15,7 +15,7 @@
 package Win32Util;
 
 use strict;
-use vars qw($DEBUG);
+use vars qw($DEBUG $browser_ole_obj);
 
 $DEBUG=1;
 
@@ -99,6 +99,20 @@ sub start_html_viewer_dde {
     my $file = shift;
     my ($app, $topic) = get_html_viewer_dde();
     start_dde($app, $topic, $file);
+}
+
+# XXX change to use IE or NS
+# XXX Test it...
+# Return a Win32::OLE object. With the 
+sub show_browser_file {
+    require Win32::OLE ;
+    my $file = shift;
+    if (!defined $browser_ole_obj) {
+	$browser_ole_obj = Win32::OLE->new('InternetExplorer.Application');
+    }
+    if (defined $file && defined $browser_ole_obj) {
+	$browser_ole_obj->Navigate($file);
+    }
 }
 
 sub start_mail_composer {
@@ -256,31 +270,49 @@ sub install_extension {
 	    warn "Extension $ext does not start with dot";
 	}
     }
-    my $name = $args{-name} or die "Missing -name parameter";
-    my $icon = $args{-icon};
-    my $open = $args{"-open"};
+    my $name  = $args{-name} or die "Missing -name parameter";
+    my $icon  = $args{-icon};
+    my $open  = $args{"-open"};
+    my $print = $args{"-print"};
+    my $desc  = $args{"-desc"};
+    my $mime  = $args{"-mime"};
     eval q{
 	use Win32::Registry;
 	foreach my $ext (@ext) {
 	    my $ext_reg;
 	    $main::HKEY_CLASSES_ROOT->Create($ext, $ext_reg);
 	    $ext_reg->SetValue("", REG_SZ, $name);
+	    if (defined $mime) {
+		$ext_reg->SetValueEx("Content Type", 0, REG_SZ, $mime);
+	    }
 	}
 	my $name_reg;
 	$main::HKEY_CLASSES_ROOT->Create($name, $name_reg);
+	if (defined $desc) {
+	    $name_reg->SetValue("", REG_SZ, $desc);
+	}
 	if (defined $icon) {
 	    my $icon_reg;
 	    $name_reg->Create("DefaultIcon", $icon_reg);
 	    $icon_reg->SetValue("", REG_SZ, $icon);
 	}
-	if (defined $open) {
-	    my $shell_reg;
+	my $shell_reg;
+	if (defined $open && defined $print) {
 	    $name_reg->Create("shell", $shell_reg);
+	}
+	if (defined $open) {
 	    my $open_reg;
 	    $shell_reg->Create("open", $open_reg);
 	    my $command_reg;
 	    $open_reg->Create("command", $command_reg);
 	    $command_reg->SetValue("", REG_SZ, $open);
+	}
+	if (defined $print) {
+	    my $print_reg;
+	    $shell_reg->Create("print", $print_reg);
+	    my $command_reg;
+	    $print_reg->Create("command", $command_reg);
+	    $command_reg->SetValue("", REG_SZ, $print);
 	}
     };
     warn $@ if ($@);
@@ -418,11 +450,15 @@ sub create_internet_shortcut {
 
 sub add_recent_doc {
     my $doc = shift;
+    warn "try $doc";
     eval q{
         use Win32::API;
+	my $SHARD_PATH = 2;
         my $addtorecentdocs = new Win32::API("shell32", "SHAddToRecentDocs",
 					     ["I", "P"], "I");
-        $addtorecentdocs->Call(2, $doc);
+	$doc .= "\0"; # XXX notwendig???
+        $addtorecentdocs->Call($SHARD_PATH, $doc);
+	warn "yeah";
     };
     warn $@ if $@;
 }
@@ -500,6 +536,65 @@ sub path2unc {
     } else {
 	$path;
     }
+}
+
+# Return maximum region for a window (without borders, title bar, taskbar
+# area).
+sub client_window_region {
+    my $top = shift;
+    my $SystemParametersInfo;
+    my $GetSystemMetrics;
+
+    my $SPI_GETWORKAREA = 48;
+    my $SM_CYCAPTION = 4;
+    #my $SM_CXBORDER = 5;
+    #my $SM_CYBORDER = 6;
+    #my $SM_CXEDGE = 45;
+    #my $SM_CYEDGE = 46;
+    my $SM_CXFRAME = 32;
+    my $SM_CYFRAME = 33;
+
+
+    my @extends;
+    eval q{
+	require Win32::API;
+	$SystemParametersInfo =
+	    new Win32::API ("user32", "SystemParametersInfo",
+			    ['N', 'N', 'P', 'N'], 'N');
+	$GetSystemMetrics =
+	    new Win32::API ("user32", "GetSystemMetrics",
+			    ['N'], 'N');
+    };
+    if ($@ || !$SystemParametersInfo || !$GetSystemMetrics) {
+	# guess region
+	@extends = (0, 0, $top->screenwidth-24, $top->screenheight-40);
+    } else {
+	my $buf = "\0"x(4*4); # size of RECT structure
+	my $r = $SystemParametersInfo->Call($SPI_GETWORKAREA, 0,
+					    $buf, 0);
+	# XXX $r überprüfen
+	@extends = unpack("V4", $buf);
+	$extends[2] -= ($extends[0] + $GetSystemMetrics->Call($SM_CXFRAME)*2);
+	$extends[3] -= ($extends[1] + $GetSystemMetrics->Call($SM_CYFRAME)*2
+			+ $GetSystemMetrics->Call($SM_CYCAPTION));
+    }
+    @extends;
+}
+
+# Maximize the window. If Win32::API is installed, then the taskbar will not
+# be obscured.
+sub maximize {
+    my $top = shift;
+    my @extends = client_window_region($top);
+    $top->geometry("$extends[2]x$extends[3]+$extends[0]+$extends[1]");
+}
+
+# "use locale" does not work on Windows. This is a hack...
+sub sort_cmp_hack {
+    my($s1, $s2) = @_;
+    $s1 =~ tr/äöüß/aous/;
+    $s2 =~ tr/äöüß/aous/;
+    $s1 cmp $s2;
 }
 
 1;
