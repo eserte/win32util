@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 #
-# $Id: Win32Util.pm,v 1.10 2000/03/04 16:32:12 eserte Exp $
+# $Id: Win32Util.pm,v 1.11 2000/07/29 01:38:03 eserte Exp $
 # Author: Slaven Rezic
 #
 # Copyright (C) 1999 Slaven Rezic. All rights reserved.
@@ -42,6 +42,30 @@ $DEBUG=1;
 #	  -recipient => 'eserte@192.168.1.1',
 #	  -subject => 'Eine Test-Mail mit MAPI',
 #	  -body => "jfirejreg  ger\ngfhuefheirgre\nTest 1.2.3.4.....\n\ngruss slaven\n");
+
+sub start_any_viewer {
+    my $file = shift;
+    require File::Basename;
+    my($n,$p,$suffix) = File::Basename::fileparse($file, "\.[^.^]*");
+    if ($suffix =~ /^html?$/) {
+	return start_html_viewer($file);
+    } elsif ($suffix eq 'ps') {
+	return start_ps_viewer($file);
+    } else {
+	my $class = get_class_by_ext($suffix);
+	if ($class) {
+	    my $cmd = get_reg_cmd($class);
+	    if (!$cmd) {
+		warn "No command for class $class";
+	    } else {
+		return start_cmd($cmd, $file);
+	    }
+	} else {
+	    warn "Can't start viewer for $file";
+	}
+    }
+    0;
+}
 
 sub start_html_viewer {
     my $file = shift;
