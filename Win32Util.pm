@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 #
-# $Id: Win32Util.pm,v 1.6 1999/04/13 13:48:04 eserte Exp $
+# $Id: Win32Util.pm,v 1.7 1999/06/29 00:11:03 eserte Exp $
 # Author: Slaven Rezic
 #
 # Copyright (C) 1999 Slaven Rezic. All rights reserved.
@@ -48,6 +48,10 @@ sub start_html_viewer {
 sub start_html_viewer_cmd {
     my $file = shift;
     my $html_viewer = get_html_viewer();
+    if ($html_viewer =~ /netscape/i) {
+	# Bei Netscape: HTML-Viewer funktioniert auf Dateien, nicht auf URLs!
+	$file =~ s/^file://;
+    }
     start_cmd($html_viewer, $file);
 }
 
@@ -421,6 +425,16 @@ sub get_cdrom_drives {
     };
     warn $@ if $@;
     @drives;
+}
+
+# expand a normal absolute path to a UNC path
+sub path2unc {
+    my $path = shift;
+    if ($path =~ m|^([a-z]):[/\\](.*)|i) {
+        "\\\\" . Win32::NodeName() . "\\" . $1 . "\\" . $2; 
+    } else {
+	$path;
+    }
 }
 
 1;
