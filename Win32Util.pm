@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 #
-# $Id: Win32Util.pm,v 1.23 2002/02/11 18:04:23 eserte Exp $
+# $Id: Win32Util.pm,v 1.24 2002/02/21 09:15:54 eserte Exp $
 # Author: Slaven Rezic
 #
 # Copyright (C) 1999, 2000, 2001 Slaven Rezic. All rights reserved.
@@ -35,7 +35,7 @@ these modules are already bundled with the popular ActivePerl package.
 use strict;
 use vars qw($DEBUG $browser_ole_obj $VERSION);
 
-$VERSION = sprintf("%d.%02d", q$Revision: 1.23 $ =~ /(\d+)\.(\d+)/);
+$VERSION = sprintf("%d.%02d", q$Revision: 1.24 $ =~ /(\d+)\.(\d+)/);
 $DEBUG=0 unless defined $DEBUG;
 
 # XXX Win-Registry-Funktionen mit Hilfe von Win32::API und
@@ -57,6 +57,12 @@ use vars qw(%API_FUNC %API_DEF);
 	    "SHAddToRecentDocs"    => {Lib => "shell32",
 				       In  => ['I', 'P'],
 				       Out => 'I'},
+	    "SHGetSpecialFolderLocation" => {Lib => "shell32",
+					     In  => ['I', 'I', 'P'],
+					     Out => 'I'},
+	    "SHGetPathFromIDList"        => {Lib => "shell32",
+					     In => ['P', 'P'],
+					     Out => 'I'},
 	    "GetLogicalDrives"     => {Lib => "kernel32",
 				       In  => [],
 				       Out => "I"},
@@ -691,6 +697,107 @@ sub get_user_folder {
     $folder;
 }
 
+=head2 get_program_folder
+
+Get the folder path for the program files (usually C:\Program Files).
+
+=cut
+
+sub get_program_folder {
+    my $folder;
+    eval q{
+        use Win32::Registry;
+        my $top_hkey = $main::HKEY_LOCAL_MACHINE;
+        my($reg_key, $key_ref, $hashref);
+        $reg_key = join('\\\\', qw(SOFTWARE Microsoft Windows CurrentVersion));
+        return unless $top_hkey->Open($reg_key, $key_ref);
+        return unless $key_ref->GetValues($hashref);
+        $folder = $hashref->{"ProgramFilesDir"}[2];
+    };
+    warn $@ if $@;
+    $folder;
+}
+
+sub get_special_folder {
+    my($folder_type) = @_;
+
+    my %sfid =
+	(
+	 ADMINTOOLS => 0x30, # only Windows 2000
+	 ALTSTARTUP => 0x1D,
+	 APPDATA => 0x1A,
+	 BITBUCKET => 0xA,
+	 COMMON_ADMINTOOLS => 0x2F, # only Windows 2000
+	 COMMON_ALTSTARTUP => 0x1D, # only Windows 2000/NT
+	 COMMON_APPDATA => 0x23, # only Windows 2000
+	 COMMON_DESKTOPDIRECTORY => 0x19, # only Windows 2000/NT
+	 COMMON_DOCUMENTS => 0x2E, # only Windows 2000/NT
+	 COMMON_FAVORITES => 0x1F, # only Windows 2000/NT
+	 COMMON_PROGRAMS => 0x17, # only Windows 2000/NT
+	 COMMON_STARTMENU => 0x16, # only Windows 2000/NT
+	 COMMON_STARTUP => 0x18, # only Windows 2000/NT
+	 COMMON_TEMPLATES => 0x2D, # only Windows 2000/NT
+	 CONTROLS => 0x3,
+	 COOKIES => 0x21,
+	 DESKTOP => 0x0,
+	 DESKTOPDIRECTORY => 0x10,
+	 DRIVES => 0x11,
+	 FAVORITES => 0x6,
+	 FONTS => 0x14,
+	 HISTORY => 0x22,
+	 INTERNET => 0x1,
+	 INTERNET_CACHE => 0x20,
+	 LOCAL_APPDATA => 0x1C, # only with MSIE 5.0
+	 MYPICTURES => 0x27, # only with MSIE 5.0
+	 NETHOOD => 0x13,
+	 NETWORK => 0x12,
+	 PERSONAL => 0x5,
+	 PRINTERS => 0x4,
+	 PRINTHOOD => 0x1B,
+	 PROFILE => 0x28, # only with MSIE 5.0
+	 PROGRAM_FILES => 0x26, # only with MSIE 5.0
+	 PROGRAM_FILES_COMMON => 0x2B, # only Windows 2000/NT
+	 PROGRAM_FILES_COMMONX86 => 0x2C, # only Windows 2000
+	 PROGRAM_FILESX86 => 0x2A, # only Windows 2000
+	 PROGRAMS => 0x2,
+	 RECENT => 0x8,
+	 SENDTO => 0x9,
+	 STARTMENU => 0xB,
+	 STARTUP => 0x7,
+	 SYSTEM => 0x25, # only with MSIE 5.0
+	 SYSTEMX86 => 0x29, # only Windows 2000
+	 TEMPLATES => 0x15,
+	 WINDOWS => 0x24, # only with MSIE 5.0
+	);
+
+    my $CSLID = $sfid{$folder_type};
+    if (!defined $CSLID) {
+	die "Folder type must be one of " . join(", ", keys %sfid) . "\n";
+    }
+
+    my $ret;
+    eval q{
+	my $SHGetSpecialFolderLocation = _get_api_function("SHGetSpecialFolderLocation") || die "Can't get API function for SHGetSpecialFolderLocation";
+	my $SHGetPathFromIDList = _get_api_function("SHGetPathFromIDList") || die "Can't get API function for SHGetPathFromIDList";
+
+	my $IDL = pack("VC", 0,0);
+	my $lResult = $SHGetSpecialFolderLocation->Call(100, $CSLID, $IDL);
+	if ($lResult == 0) {
+	    my $sPath = " "x512;
+	    my $cb;
+	    (undef, $cb) = unpack("VC", $IDL);
+	    my $cb_p = pack("C", $cb);
+	    $SHGetPathFromIDList->Call($cb_p, $sPath);
+	    $sPath =~ s/\0.*//;
+	    $ret = $sPath;
+	} else {
+	    die "Error in SHGetSpecialFolderLocation";
+	}
+    };
+    warn $@ if $@;
+    $ret;
+}
+
 =head2 get_home_dir()
 
 Get home directory (from domain server) or the $HOME variable.
@@ -1138,6 +1245,59 @@ sub get_cdrom_drives {
 		my $drive_name = chr($i + ord('A')) . ":";
 		my $drive_type = $getdrivetype->Call($drive_name);
 		push @drives, $drive_name if ($drive_type == $DRIVE_CDROM);
+	    }
+	}
+    };
+    warn $@ if $@;
+    @drives;
+}
+
+sub get_cdrom_drives {
+    get_drives('cdrom');
+}
+
+=head2 get_drives([$drive_filter])
+
+Return a list of drives on the system. The optional parameter
+C<$drive_filter> should be a comma-separated string with the possible
+values C<cdrom>, C<fixed> (for fixed drives like harddisks),
+C<ramdisk>, C<remote> (for net drives), and C<removable> (for
+removable drives like ZIP or floppy disk drives).
+
+=cut
+
+sub get_drives {
+    my($filter) = @_;
+    my @drives;
+    eval q{
+	my %drive_filter;
+	if ($filter) {
+	    my %drive_def = (cdrom => 5,
+			     fixed => 3,
+			     ramdisk => 6,
+			     remote => 4,
+			     removable => 2,
+			    );
+	    foreach my $drive (split /,/, $filter) {
+		if ($drive_def{$drive}) {
+		    $drive_filter{$drive_def{$drive}}++;
+		} else {
+		    die "Unknown drive: $drive, please use any of: " . join(", ", keys %drive_def);
+		}
+	    }
+	}
+
+	my $MAX_DOS_DRIVES = 26;
+        my $getlogicaldrives = _get_api_function("GetLogicalDrives");
+        my $getdrivetype     = _get_api_function("GetDriveType");
+	die $@ if !$getlogicaldrives || !$getdrivetype;
+        my $drives = $getlogicaldrives->Call();
+	my @drive_bits = split(//, unpack("b*", pack("L", $drives))); # XXX V statt L?
+	for my $i (0 .. $MAX_DOS_DRIVES-1) {
+	    if ($drive_bits[$i]) {
+		my $drive_name = chr($i + ord('A')) . ":";
+		my $drive_type = $getdrivetype->Call($drive_name);
+		push @drives, $drive_name if !$filter || exists $drive_filter{$drive_type};
 	    }
 	}
     };
