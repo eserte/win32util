@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 #
-# $Id: Win32Util.pm,v 1.12 2000/08/29 00:46:56 eserte Exp $
+# $Id: Win32Util.pm,v 1.13 2000/08/29 17:29:21 eserte Exp $
 # Author: Slaven Rezic
 #
 # Copyright (C) 1999 Slaven Rezic. All rights reserved.
@@ -17,7 +17,7 @@ package Win32Util;
 use strict;
 use vars qw($DEBUG $browser_ole_obj $VERSION);
 
-$VERSION = sprintf("%d.%02d", q$Revision: 1.12 $ =~ /(\d+)\.(\d+)/);
+$VERSION = sprintf("%d.%02d", q$Revision: 1.13 $ =~ /(\d+)\.(\d+)/);
 $DEBUG=0;
 
 # XXX Win-Registry-Funktionen mit Hilfe von Win32::API und
@@ -475,10 +475,9 @@ sub add_recent_doc {
     my $doc = shift;
     warn "try $doc";
     eval q{
-        use Win32::API;
+        my $addtorecentdocs = _get_api_function("SHAddToRecentDocs");
+	die $@ if !$addtorecentdocs;
 	my $SHARD_PATH = 2;
-        my $addtorecentdocs = new Win32::API("shell32", "SHAddToRecentDocs",
-					     ["I", "P"], "I");
 	$doc .= "\0"; # XXX notwendig???
         $addtorecentdocs->Call($SHARD_PATH, $doc);
 	warn "yeah";
@@ -530,13 +529,11 @@ sub create_program_group {
 sub get_cdrom_drives {
     my @drives;
     eval q{
-	use Win32::API;
 	my $DRIVE_CDROM = 5;
 	my $MAX_DOS_DRIVES = 26;
-        my $getlogicaldrives = new Win32::API("kernel32", "GetLogicalDrives",
-					      [], "I");
-        my $getdrivetype = new Win32::API("kernel32", "GetDriveType",
-					  ["P"], "I");
+        my $getlogicaldrives = _get_api_function("GetLogicalDrives");
+        my $getdrivetype     = _get_api_function("GetDriveType");
+	die $@ if !$getlogicaldrives || !$getdrivetype;
         my $drives = $getlogicaldrives->Call();
 	my @drive_bits = split(//, unpack("b*", pack("L", $drives))); # XXX V statt L?
 	for my $i (0 .. $MAX_DOS_DRIVES-1) {
@@ -561,12 +558,46 @@ sub path2unc {
     }
 }
 
+use vars qw(%API_FUNC %API_DEF);
+
+%API_DEF = ("SystemParametersInfo" => {Lib => "user32",
+				       In  => ['N', 'N', 'P', 'N'],
+				       Out => 'N'},
+	    "GetSystemMetrics"     => {Lib => "user32",
+				       In  => ['N'],
+				       Out => 'N'},
+	    "SHAddToRecentDocs"    => {Lib => "shell32",
+				       In  => ['I', 'P'],
+				       Out => 'I'},
+	    "GetLogicalDrives"     => {Lib => "kernel32",
+				       In  => [],
+				       Out => "I"},
+	    "GetDriveType"         => {Lib => "kernel32",
+				       In  => ["P"],
+				       Out => "I"},
+	   );
+	    
+sub _get_api_function {
+    my $name = shift;
+    eval {
+	require Win32::API;
+	if (!exists $API_FUNC{$name}) {
+	    my $def = $API_DEF{$name};
+	    if (!$def) {
+		die "No API definition for $name";
+	    }
+	    $API_FUNC{$name} = new Win32::API ($def->{Lib}, $name,
+					       $def->{In}, $def->{Out});
+	}
+    };
+    #warn $@ if $@;
+    $API_FUNC{$name};
+}
+
 # Return maximum region for a window (without borders, title bar, taskbar
 # area).
 sub client_window_region {
     my $top = shift;
-    my $SystemParametersInfo;
-    my $GetSystemMetrics;
 
     my $SPI_GETWORKAREA = 48;
     my $SM_CYCAPTION = 4;
@@ -579,27 +610,44 @@ sub client_window_region {
 
 
     my @extends;
-    eval q{
-	require Win32::API;
-	$SystemParametersInfo =
-	    new Win32::API ("user32", "SystemParametersInfo",
-			    ['N', 'N', 'P', 'N'], 'N');
-	$GetSystemMetrics =
-	    new Win32::API ("user32", "GetSystemMetrics",
-			    ['N'], 'N');
-    };
-    if ($@ || !$SystemParametersInfo || !$GetSystemMetrics) {
+    _get_api_function("SystemParametersInfo");
+    _get_api_function("GetSystemMetrics");
+    if (!$API_FUNC{SystemParametersInfo} ||
+	!$API_FUNC{GetSystemMetrics}) {
 	# guess region
 	@extends = (0, 0, $top->screenwidth-24, $top->screenheight-40);
     } else {
 	my $buf = "\0"x(4*4); # size of RECT structure
-	my $r = $SystemParametersInfo->Call($SPI_GETWORKAREA, 0,
-					    $buf, 0);
+	my $r = $API_FUNC{SystemParametersInfo}->Call($SPI_GETWORKAREA, 0,
+						      $buf, 0);
 	# XXX $r überprüfen
 	@extends = unpack("V4", $buf);
-	$extends[2] -= ($extends[0] + $GetSystemMetrics->Call($SM_CXFRAME)*2);
-	$extends[3] -= ($extends[1] + $GetSystemMetrics->Call($SM_CYFRAME)*2
-			+ $GetSystemMetrics->Call($SM_CYCAPTION));
+	$extends[2] -= ($extends[0] +
+			$API_FUNC{GetSystemMetrics}->Call($SM_CXFRAME)*2);
+	$extends[3] -= ($extends[1] +
+			$API_FUNC{GetSystemMetrics}->Call($SM_CYFRAME)*2 +
+			$API_FUNC{GetSystemMetrics}->Call($SM_CYCAPTION));
+    }
+    @extends;
+}
+
+# Return maximum screen size without taskbar area)
+sub screen_region {
+    my $top = shift;
+
+    my $SPI_GETWORKAREA = 48;
+
+    my @extends;
+    _get_api_function("SystemParametersInfo");
+    if (!$API_FUNC{SystemParametersInfo}) {
+	# guess region
+	@extends = (0, 0, $top->screenwidth, $top->screenheight-20);
+    } else {
+	my $buf = "\0"x(4*4); # size of RECT structure
+	my $r = $API_FUNC{SystemParametersInfo}->Call($SPI_GETWORKAREA, 0,
+						      $buf, 0);
+	# XXX $r überprüfen
+	@extends = unpack("V4", $buf);
     }
     @extends;
 }
