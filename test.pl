@@ -93,3 +93,21 @@ if ($testall) {
 		  -body => "jfirejreg  ger\ngfhuefheirgre\nTest 1.2.3.4.....\n\ngruss slaven\n");
     }
 }
+
+eval {
+    require Tk;
+    my $mw = MainWindow->new;
+    $mw->gridRowconfigure($_, -weight => 1) for (0..2);
+    $mw->gridColumnconfigure($_, -weight => 1) for (0..1);
+    Tk::grid( $mw->Label(-text => q{top}), -sticky => q{n}, -columnspan => 2 );
+    $mw->Label(-text => q{left})->grid(-row => 1, -column => 0, -sticky => q{w});
+    $mw->Label(-text => q{right})->grid(-row => 1, -column => 1, -sticky => q{e});
+    Tk::grid( $mw->Label(-text => q{bottom}, -bg => q{red}), -sticky => q{s}, -columnspan => 2 );
+    $mw->update;
+    Win32Util::maximize($mw);
+    #$mw->update;
+    $mw->after(1000, sub { $mw->destroy });
+    Tk::MainLoop();
+};
+
+
