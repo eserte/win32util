@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 #
-# $Id: Win32Util.pm,v 1.19 2001/02/02 02:22:33 eserte Exp $
+# $Id: Win32Util.pm,v 1.20 2001/02/07 22:46:02 eserte Exp $
 # Author: Slaven Rezic
 #
 # Copyright (C) 1999, 2000, 2001 Slaven Rezic. All rights reserved.
@@ -35,7 +35,7 @@ these modules are already bundled with the popular ActivePerl package.
 use strict;
 use vars qw($DEBUG $browser_ole_obj $VERSION);
 
-$VERSION = sprintf("%d.%02d", q$Revision: 1.19 $ =~ /(\d+)\.(\d+)/);
+$VERSION = sprintf("%d.%02d", q$Revision: 1.20 $ =~ /(\d+)\.(\d+)/);
 $DEBUG=0 unless defined $DEBUG;
 
 # XXX Win-Registry-Funktionen mit Hilfe von Win32::API und
@@ -856,12 +856,13 @@ sub create_internet_shortcut {
 	    $file = join('\\\\', $desktop, "$name.url");
 	}
 
+	my $crlf = "\015\012";
 	open(URL, ">$file") or die "Can't save $file: $!";
-	print URL "[InternetShortcut]\n";
-	print URL "URL=$url\n";
+	print URL "[InternetShortcut]$crlf";
+	print URL "URL=$url$crlf";
 	if (defined $icon) {
-	    print URL "IconFile=$icon\n";
-	    print URL "IconIndex=0\n";
+	    print URL "IconFile=$icon$crlf";
+	    print URL "IconIndex=0$crlf";
 	}
 	close URL;
     };
