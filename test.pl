@@ -29,3 +29,24 @@ print "ok 1\n";
 # (correspondingly "not ok 13") depending on the success of chunk 13
 # of the test code):
 
+warn Win32Util::get_user_name();
+
+exit;
+
+package Win32Util;
+
+#*start_html_viewer = \&start_html_viewer_dde;
+#*start_html_viewer = \&start_html_viewer_cmd;
+#*start_ps_viewer = \&start_ps_viewer_cmd;
+#*start_ps_print = \&start_ps_print_cmd;
+
+warn get_ps_viewer();
+start_ps_viewer('C:\ghost\gs4.03\tiger.ps');
+start_html_viewer('c:\users\slaven\bbbike-devel\bbbike.html');
+start_mail_composer('mailto:eserte@onlineoffice.de');
+warn get_user_folder();
+warn get_cdrom_drives();
+send_mail(-sender => 'eserte@cs.tu-berlin.de',
+	  -recipient => 'eserte@192.168.1.1',
+	  -subject => 'Eine Test-Mail mit MAPI',
+	  -body => "jfirejreg  ger\ngfhuefheirgre\nTest 1.2.3.4.....\n\ngruss slaven\n");
