@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 #
-# $Id: Win32Util.pm,v 1.30 2003/01/30 14:34:52 eserte Exp $
+# $Id: Win32Util.pm,v 1.31 2004/01/11 12:22:20 eserte Exp $
 # Author: Slaven Rezic
 #
 # Copyright (C) 1999-2003 Slaven Rezic. All rights reserved.
@@ -35,7 +35,7 @@ these modules are already bundled with the popular ActivePerl package.
 use strict;
 use vars qw($DEBUG $browser_ole_obj $VERSION);
 
-$VERSION = sprintf("%d.%02d", q$Revision: 1.30 $ =~ /(\d+)\.(\d+)/);
+$VERSION = sprintf("%d.%02d", q$Revision: 1.31 $ =~ /(\d+)\.(\d+)/);
 $DEBUG=0 unless defined $DEBUG;
 
 # XXX Win-Registry-Funktionen mit Hilfe von Win32::API und
@@ -1645,3 +1645,14 @@ it under the same terms as Perl itself.
 =cut
 
 1;
+
+__END__
+
+Subject: Re: Best way to locate Windows install dir?
+
+I think that in practice env(windir) (note lowercase spelling) is
+indeed the most portable method.  It exists and is well-known since
+Win 3.x.
+
+You could also code your own small extension to call the
+GetWindowsDirectory() API. 
