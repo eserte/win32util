@@ -179,34 +179,85 @@ sub get_user_folder {
 sub install_extension {
     my(%args) = @_;
     my $ext  = $args{-extension} or die "Missing -extension parameter";
-    if ($ext !~ /^\./) {
-	warn "Extension $ext does not start with dot";
+    my @ext;
+    if (ref $ext eq 'ARRAY') {
+        push @ext, @$ext;
+    } else {
+        push @ext, $ext;
+    }
+    foreach my $ext (@ext) {
+        if ($ext !~ /^\./) {
+	    warn "Extension $ext does not start with dot";
+	}
     }
     my $name = $args{-name} or die "Missing -name parameter";
     my $icon = $args{-icon};
-    my $open = $args{-open};
+    my $open = $args{"-open"};
     eval q{
 	use Win32::Registry;
-	my $ext_reg;
-	$main::HKEY_CLASSES_ROOT->Create($extension, \$ext_reg);
-	$ext_reg->SetValue("", $name);
+	foreach my $ext (@ext) {
+	    my $ext_reg;
+	    $main::HKEY_CLASSES_ROOT->Create($ext, $ext_reg);
+	    $ext_reg->SetValue("", REG_SZ, $name);
+	}
 	my $name_reg;
-	$main::HKEY_CLASSES_ROOT->Create($name, \$name_reg);
+	$main::HKEY_CLASSES_ROOT->Create($name, $name_reg);
 	if (defined $icon) {
 	    my $icon_reg;
-	    $name_reg->Create("DefaultIcon", \$icon_reg);
-	    $icon_reg->SetValue("", $icon);
+	    $name_reg->Create("DefaultIcon", $icon_reg);
+	    $icon_reg->SetValue("", REG_SZ, $icon);
 	}
 	if (defined $open) {
 	    my $shell_reg;
-	    $name_reg->Create("shell", \$shell_reg);
+	    $name_reg->Create("shell", $shell_reg);
 	    my $open_reg;
-	    $shell_reg->Create("open", \$open_reg);
+	    $shell_reg->Create("open", $open_reg);
 	    my $command_reg;
-	    $open_reg->Create("command", \$command_reg);
-	    $command_reg->SetValue("", $open);
+	    $open_reg->Create("command", $command_reg);
+	    $command_reg->SetValue("", REG_SZ, $open);
 	}
     };
+    warn $@ if ($@);
+}
+
+sub create_shortcut {
+    my(%args) = @_;
+    my $path = delete $args{-path} || die "Missing -path parameter";
+    my $args = delete $args{-args};
+    my $icon = delete $args{-icon};
+    my $name = delete $args{-name} || die "Missing -name parameter";
+        
+    eval q{
+        use Win32::Shortcut;
+
+	my $desktop = get_user_folder("Desktop");
+	if (!defined $desktop) {
+	    die "Can't get Desktop directory";
+	}
+	
+        my $file = join('\\\\', $desktop, "$name.lnk");   
+
+        my $scut = new Win32::Shortcut;
+        $scut->{Path} = $path;
+        $scut->{Arguments} = $args if defined $args;
+        $scut->{IconLocation} = $icon if defined $icon;
+        foreach my $key (keys %args) {
+            $scut->{$key} = $args{$key};
+        }
+        $scut->{File} = $file;
+        die "Can't save $file" if !$scut->Save;      
+    };
+    warn $@ if ($@);
+}
+
+sub add_recent_doc {
+    my $doc = shift;
+    eval q{
+        use Win32::API;
+        my $addtorecentdocs = new Win32::API("shell32", "SHAddToRecentDocs", ["I", "P"], "I");
+        $addtorecentdocs->Call(2, $doc);
+    };
+    warn $@ if $@;
 }
 
 1;
