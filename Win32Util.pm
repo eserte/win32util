@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 #
-# $Id: Win32Util.pm,v 1.33 2004/04/13 22:41:56 eserte Exp $
+# $Id: Win32Util.pm,v 1.34 2004/10/19 19:27:36 eserte Exp $
 # Author: Slaven Rezic
 #
 # Copyright (C) 1999-2004 Slaven Rezic. All rights reserved.
@@ -35,7 +35,7 @@ these modules are already bundled with the popular ActivePerl package.
 use strict;
 use vars qw($DEBUG $browser_ole_obj $VERSION);
 
-$VERSION = sprintf("%d.%02d", q$Revision: 1.33 $ =~ /(\d+)\.(\d+)/);
+$VERSION = sprintf("%d.%02d", q$Revision: 1.34 $ =~ /(\d+)\.(\d+)/);
 $DEBUG=0 unless defined $DEBUG;
 
 # XXX Win-Registry-Funktionen mit Hilfe von Win32::API und
@@ -222,6 +222,29 @@ sub start_ps_print_cmd {
     my $ps_print = get_ps_print();
     start_cmd($ps_print, $file);
 }
+
+# XXX Maybe make a start_pdf_print with this information:
+#
+# --- CUT START ---
+# Other options for the command line are:
+# AcroRd32.exe /p filename - Executes the Reader and prints a file.
+#    /n Launch a separate instance of the Acrobat application, even if one is
+# currently open.
+#    /s Open Acrobat, suppressing the splash screen.
+#    /o Open Acrobat, suppressing the open file dialog.
+#    /h Open Acrobat in hidden mode.
+# AcroRd32.exe /t path printername drivername portname - Initiates
+# Acrobat Reader, prints a file while suppressing the Acrobat print dialog
+# box, then terminates Reader.
+
+# The four parameters of the /t option evaluate to path, printername,
+# drivername, and portname (all strings).
+# printername - The name of your printer.
+# drivername - Your printer driver's name. Whatever appears in the Driver Used
+# box when you view your printer's properties.
+# portname - The printer's port. portname cannot contain any "/" characters;
+# if it does, output is routed to the default port for that printer.
+# --- CUT END ---
 
 sub start_txt_print {
     my $file = shift;
@@ -1518,6 +1541,18 @@ sub get_sys_color {
     $g = ($i >> 8) & 0xff;
     $r = $i & 0xff;
     ($r, $g, $b);
+}
+
+=head2 close_dosbox()
+
+Closes the dosbox. Handy if starting a GUI program with the standard
+perl.exe and not wperl.exe.
+
+=cut
+
+sub close_dosbox {
+    require Win32::Console;
+    Win32::Console::Free();
 }
 
 =head2 disable_dosbox_close_button()
