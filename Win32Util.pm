@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 #
-# $Id: Win32Util.pm,v 1.5 1999/03/05 23:16:53 eserte Exp $
+# $Id: Win32Util.pm,v 1.6 1999/04/13 13:48:04 eserte Exp $
 # Author: Slaven Rezic
 #
 # Copyright (C) 1999 Slaven Rezic. All rights reserved.
@@ -106,6 +106,10 @@ sub get_ps_print {
     get_reg_cmd($class, "print");
 }
 sub get_mail_composer { get_reg_cmd("mailto") }
+# weitere Mail-Composer-Einträge in der Registry:
+# HKEY_LOCAL_MACHINE\Clients\mail\Netscape Messenger\Protocols\mailto\shell\open\command => Path to mailprg
+# HKEY_LOCAL_MACHINE\Clients\mail\Pegasus Mail\Protocols\mailto\shell\open\command => Path to mailprg
+# HKEY_LOCAL_MACHINE\Clients\mail\Pegasus Mail\Shell\open\command => Path to mailprg
 
 sub get_html_viewer_dde {
     eval q{
@@ -182,7 +186,7 @@ sub start_cmd {
 				    0, NORMAL_PRIORITY_CLASS, ".");
     };
     if ($@) { # try Win32::Spawn (built-in)
-        use Win32;
+        #use Win32; # XXX not needed
         my $pid;
         $r = Win32::Spawn($appname, $cmdline, $pid);
     }
