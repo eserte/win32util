@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 #
-# $Id: Win32Util.pm,v 1.20 2001/02/07 22:46:02 eserte Exp $
+# $Id: Win32Util.pm,v 1.21 2001/04/07 19:15:31 eserte Exp $
 # Author: Slaven Rezic
 #
 # Copyright (C) 1999, 2000, 2001 Slaven Rezic. All rights reserved.
@@ -35,7 +35,7 @@ these modules are already bundled with the popular ActivePerl package.
 use strict;
 use vars qw($DEBUG $browser_ole_obj $VERSION);
 
-$VERSION = sprintf("%d.%02d", q$Revision: 1.20 $ =~ /(\d+)\.(\d+)/);
+$VERSION = sprintf("%d.%02d", q$Revision: 1.21 $ =~ /(\d+)\.(\d+)/);
 $DEBUG=0 unless defined $DEBUG;
 
 # XXX Win-Registry-Funktionen mit Hilfe von Win32::API und
@@ -499,6 +499,70 @@ sub install_extension {
     warn $@ if ($@);
 }
 
+=head2 write_uninstall_information
+
+=cut
+
+sub write_uninstall_information {
+    my(%args) = @_;
+
+    my $appname         = delete $args{-appname} || die "-appname missing";
+    my $uninstallstring = delete $args{-uninstallstring} || die "-uninstallstring missing";
+    my $regowner        = delete $args{-regowner} || get_user_name(); # XXX full name?
+    my $version         = delete $args{-version};
+    my($versionmajor, $versionminor);
+    if (defined $version && $version =~ /^(\d+)\.(\d+)$/) {
+	($versionmajor, $versionminor) = ($1, $2);
+    }
+    my $appfullname = $appname;
+    if (defined $version) {
+	$appfullname .= " $version";
+    }
+    my $installdate     = delete $args{-installdate} || do {
+	my(@l) = localtime;
+	sprintf "%04d-%02d-%02d", $l[5]+1900, $l[4]+1, $l[3];
+    };
+    my $installlocation = delete $args{-installlocation};
+    my $installsource   = delete $args{-installsource};
+    my $modifypath      = delete $args{-modifypath};
+    my $publisher       = delete $args{-publisher};
+# XXX maybe s|/|//|g and s|//|///|g (see ext_uninst2.reg example)
+    my $urlinfoabout    = delete $args{-urlinfoabout};
+    my $urlupdateinfo   = delete $args{-urlupdateinfo};
+
+    if (keys %args) {
+	die "Unknown arguments: " . join(" ", keys %args);
+    }
+
+    eval <<'EOF';
+
+    use Win32::TieRegistry;
+    my $machKey = Win32::TieRegistry->new("LMachine")
+	or die "Can't access HKEY_LOCAL_MACHINE key: $^E";
+    my $appKey  = "Software/Microsoft/Windows/CurrentVersion/Uninstall/"
+	          . $appfullname;
+    delete $machKey->{$appKey};
+    $machKey->{"$appKey/"} =
+	{"/RegOwner" => $regowner,
+	 (defined $version ? ("/DisplayVersion" => $version) : ()),
+	 "/InstallDate" => $installdate,
+	 (defined $installlocation ? ("/InstallLocation" => $installlocation) : ()),
+	 (defined $installsource ? ("/InstallSource" => $installsource) : ()),
+	 (defined $modifypath ? ("/ModifyPath" => $modifypath) : ()),
+	 (defined $publisher ? ("/Publisher" => $publisher) : ()),
+	 "/UninstallString" => $uninstallstring,
+	 (defined $urlinfoabout ? ("/UrlInfoAbout" => $urlinfoabout) : ()),
+	 (defined $urlupdateinfo ? ("/UrlUpdateInfo" => $urlupdateinfo) : ()),
+	 (defined $versionmajor ? ("/VersionMajor" => [$versionmajor, "REG_DWORD"]) : ()),
+	 (defined $versionminor ? ("/VersionMinor" => [$versionminor, "REG_DWORD"]) : ()),
+	 "/DisplayName" => $appfullname,
+	};
+
+EOF
+    warn $@ if $@;
+
+}
+
 =head1 USER FUNCTIONS
 
 =head2 get_user_name
@@ -508,8 +572,24 @@ Get current windows user.
 =cut
 
 sub get_user_name {
+    my(%args) = @_;
+    
+    # first try the domain user
+    if ($args{-full}) {
+    	my $server = get_domain_server();
+    	if (defined $server) {
+	    my $userinfo = {};
+	    Win32API::Net::UserGetInfo($server, Win32::LoginName, 2, $userinfo);
+	    if ($userinfo) {
+	        return $userinfo->{fullName};
+	    }
+	}
+    }
+    
     _get_api_function("GetUserName");
-    return unless $API_FUNC{GetUserName};
+    if (!$API_FUNC{GetUserName}) {
+	return Win32::LoginName();
+    }
     my $max = 256;
     my $maxb = pack("L", $max);
     my $login = "\0"x$max;
@@ -572,6 +652,29 @@ sub get_user_folder {
     $folder;
 }
 
+=head2 get_home_dir()
+
+Get home directory (from domain server) or the $HOME variable.
+
+=cut
+
+sub get_home_dir {
+    my(%args) = @_;
+
+    # first try the domain user
+    my $server = get_domain_server();
+    if (defined $server) {
+    	my($userinfo) = {};
+	Win32API::Net::UserGetInfo($server, Win32::LoginName, 2, $userinfo);
+	if ($userinfo) {
+	    return $userinfo->{homeDir};
+	}
+    }
+
+    $ENV{HOMESHARE} || $ENV{HOME};
+}
+
+
 =head1 WWW AND NET FUNCTIONS
 
 =head2 lwp_auto_proxy($lwp_user_agent)
@@ -621,6 +724,15 @@ sub lwp_auto_proxy {
 	    $lwp_user_agent->no_proxy("127.0.0.1", "localhost");
 	}
     }
+}
+
+sub get_domain_server {
+    if (eval { require Win32API::Net; 1 }) {
+    	my($x1, $server, $x2, $userinfo);
+	Win32API::Net::GetDCName($x1, $x2, $server);
+	return $server;
+    }
+    undef;
 }
 
 =head1 MAIL FUNCTIONS
@@ -1139,9 +1251,13 @@ sort for german umlauts.
 
 sub sort_cmp_hack {
     my($s1, $s2) = @_;
-    $s1 =~ tr/дцья/aous/;
-    $s2 =~ tr/дцья/aous/;
-    $s1 cmp $s2;
+    sort_cmp_hack_transform($s1) cmp sort_cmp_hack_transform($s2);
+}
+
+sub sort_cmp_hack_transform {
+    my $s = shift;
+    $s =~ tr/дцья/aous/;
+    $s;
 }
 
 =head1 SEE ALSO
