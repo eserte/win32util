@@ -1,3 +1,17 @@
+# -*- perl -*-
+
+#
+# $Id: Win32Util.pm,v 1.5 1999/03/05 23:16:53 eserte Exp $
+# Author: Slaven Rezic
+#
+# Copyright (C) 1999 Slaven Rezic. All rights reserved.
+# This package is free software; you can redistribute it and/or
+# modify it under the same terms as Perl itself.
+#
+# Mail: eserte@cs.tu-berlin.de
+# WWW:  http://user.cs.tu-berlin.de/~eserte/
+#
+
 package Win32Util;
 
 use strict;
@@ -15,7 +29,7 @@ $DEBUG=1;
 
 #warn get_ps_viewer();
 #start_ps_viewer('G:\ghost\gs4.03\tiger.ps');
-#start_html_viewer('F:\perl5005\5.005\html\index.html') if $DEBUG;
+#start_html_viewer('e:\slaven\bbbike-2.58\bbbike.html');
 #start_mail_composer('eserte@onlineoffice.de');
 #warn get_user_folder();
 #warn get_cdrom_drives();
@@ -34,7 +48,7 @@ sub start_html_viewer {
 sub start_html_viewer_cmd {
     my $file = shift;
     my $html_viewer = get_html_viewer();
-    start_cmd($html_viewer, $file);    
+    start_cmd($html_viewer, $file);
 }
 
 sub start_ps_viewer {
@@ -49,7 +63,7 @@ sub start_ps_viewer {
 sub start_ps_viewer_cmd {
     my $file = shift;
     my $ps_viewer = get_ps_viewer();
-    start_cmd($ps_viewer, $file);    
+    start_cmd($ps_viewer, $file);
 }
 
 sub start_ps_print {
@@ -64,13 +78,13 @@ sub start_ps_print {
 sub start_ps_print_cmd {
     my $file = shift;
     my $ps_print = get_ps_print();
-    start_cmd($ps_print, $file);    
+    start_cmd($ps_print, $file);
 }
 
 sub start_html_viewer_dde {
     my $file = shift;
     my ($app, $topic) = get_html_viewer_dde();
-    start_dde($app, $topic, $file);    
+    start_dde($app, $topic, $file);
 }
 
 sub start_mail_composer {
@@ -79,9 +93,18 @@ sub start_mail_composer {
     start_cmd($mailto_cmd, $mailadr);
 }
 
-sub get_html_viewer { get_reg_cmd("htmlfile") }
-sub get_ps_viewer { get_reg_cmd("psfile") }
-sub get_ps_print { get_reg_cmd("psfile", "print") }
+sub get_html_viewer {
+    my $class = get_class_by_ext(".htm") || "htmlfile";
+    get_reg_cmd($class);
+}
+sub get_ps_viewer {
+    my $class = get_class_by_ext(".ps") || "psfile";
+    get_reg_cmd($class);
+}
+sub get_ps_print {
+    my $class = get_class_by_ext(".ps") || "psfile";
+    get_reg_cmd($class, "print");
+}
 sub get_mail_composer { get_reg_cmd("mailto") }
 
 sub get_html_viewer_dde {
@@ -104,13 +127,27 @@ sub get_reg_cmd {
     eval q{
         use Win32::Registry;
         my($reg_key, $key_ref, $hashref);
-        $reg_key = join('\\\\', $filetype, 'shell', $opentype, 'command'); 
+        $reg_key = join('\\\\', $filetype, 'shell', $opentype, 'command');
         return unless $main::HKEY_CLASSES_ROOT->Open($reg_key, $key_ref);
         return unless $key_ref->GetValues($hashref);
         $cmd = $hashref->{""}[2];
     };
     warn $@ if $@;
     $cmd;
+}
+
+sub get_class_by_ext {
+    my $ext = shift;
+    my $class;
+    eval q{
+        use Win32::Registry;
+        my($key_ref, $hashref);
+        return unless $main::HKEY_CLASSES_ROOT->Open($ext, $key_ref);
+        return unless $key_ref->GetValues($hashref);
+        $class = $hashref->{""}[2];
+    };
+    warn $@ if $@;
+    $class;
 }
 
 sub start_cmd {
@@ -125,12 +162,18 @@ sub start_cmd {
         my $argstr = join(" ", @words);
         $base = basename($appname); $base =~ s/\"//g;
         $cmdline = $base;
-        $argstr =~ s/(%(\d))/ defined($args[$2-1]) ? $args[$2-1] : "" /eg;
+        my %arg_used;
+        $argstr =~ s/(%(\d))/ $arg_used{$2-1}=1; defined($args[$2-1]) ? $args[$2-1] : "" /eg;
         $cmdline .= " $argstr";
+        for my $i (0 .. $#args) {
+            if (!$arg_used{$i}) {
+                $cmdline .= " $args[$i]";
+            }
+        }
         warn "start_cmd: " . $cmdline . "\n" if $DEBUG;
     };
     warn $@ if $@;
-    
+
     my $r;
     eval q{
         use Win32::Process;
@@ -143,7 +186,7 @@ sub start_cmd {
         my $pid;
         $r = Win32::Spawn($appname, $cmdline, $pid);
     }
-    $r;    
+    $r;
 }
 
 sub start_dde {
@@ -171,12 +214,12 @@ sub get_user_folder {
     my $folder;
     eval q{
         use Win32::Registry;
-        my $top_hkey = ($public 
+        my $top_hkey = ($public
 			? $main::HKEY_CURRENT_MACHINE
 			: $main::HKEY_CURRENT_USER);
         my($reg_key, $key_ref, $hashref);
         $reg_key = join('\\\\', qw(SOFTWARE Microsoft Windows CurrentVersion
-				   Explorer), 'Shell Folders'); 
+				   Explorer), 'Shell Folders');
         return unless $top_hkey->Open($reg_key, $key_ref);
         return unless $key_ref->GetValues($hashref);
         $folder = $hashref->{$foldertype}[2];
@@ -231,6 +274,8 @@ sub install_extension {
 # -icon: Pfad zur .ico-Datei
 # -name: Titel des Programms (erforderlich)
 # -file: Pfad, wo die .lnk-Datei abgespeichert werden soll
+#        Wenn -file nicht angegeben ist, wird der Shortcut auf dem Desktop
+#        mit dem Filenamen -name .lnk abgespeichert.
 sub create_shortcut {
     my(%args) = @_;
     my $path  = delete $args{-path} || die "Missing -path parameter";
@@ -238,7 +283,7 @@ sub create_shortcut {
     my $icon  = delete $args{-icon};
     my $name  = delete $args{-name} || die "Missing -name parameter";
     my $file  = delete $args{-file};
-        
+
     eval q{
         use Win32::Shortcut;
 
@@ -258,7 +303,42 @@ sub create_shortcut {
             $scut->{$key} = $args{$key};
         }
         $scut->{File} = $file;
-        die "Can't save $file" if !$scut->Save;      
+        die "Can't save $file" if !$scut->Save;
+    };
+    warn $@ if ($@);
+}
+
+# Argumente:
+# -url: URL für den Shortcut (erforderlich)
+# -icon: Pfad zur .ico-Datei
+# -name: Titel des Programms (erforderlich)
+# -file: Pfad, wo die .url-Datei abgespeichert werden soll
+#        Wenn -file nicht angegeben ist, wird der Shortcut auf dem Desktop
+#        mit dem Filenamen -name .url abgespeichert.
+sub create_internet_shortcut {
+    my(%args) = @_;
+    my $url   = delete $args{-url} || die "Missing -url parameter";
+    my $icon  = delete $args{-icon};
+    my $name  = delete $args{-name} || die "Missing -name parameter";
+    my $file  = delete $args{-file};
+
+    eval q{
+        if (!defined $file) {
+            my $desktop = get_user_folder("Desktop");
+            if (!defined $desktop) {
+    	        die "Can't get Desktop directory";
+	    }
+	    $file = join('\\\\', $desktop, "$name.url");
+	}
+
+	open(URL, ">$file") or die "Can't save $file: $!";
+	print URL "[InternetShortcut]\n";
+	print URL "URL=$url\n";
+	if (defined $icon) {
+	    print URL "IconFile=$icon\n";
+	    print URL "IconIndex=0\n";
+	}
+	close URL;
     };
     warn $@ if ($@);
 }
@@ -290,7 +370,7 @@ sub create_program_group {
 	use File::Basename;
 	my $progdir = get_user_folder("Programs", $public);
 	die "Can't get user folder." if !$progdir;
-	my $topdir  = "$progdir/$parent"; 
+	my $topdir  = "$progdir/$parent";
 	if (!-d $topdir) {
 	    mkpath([$topdir], 0, 0755);
 	}
@@ -303,8 +383,13 @@ sub create_program_group {
 				  -name => basename($file),
 				 );
 	    }
-	    $shortcut_args{-file} = "$topdir/$shortcut_args{-name}.lnk";
-	    create_shortcut(%shortcut_args);
+	    if (exists $shortcut_args{-url}) {
+	        $shortcut_args{-file} = "$topdir/$shortcut_args{-name}.url";
+	        create_internet_shortcut(%shortcut_args);
+	    } else {
+	        $shortcut_args{-file} = "$topdir/$shortcut_args{-name}.lnk";
+	        create_shortcut(%shortcut_args);
+	    }
 	}
     };
     warn $@ if $@;
