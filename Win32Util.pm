@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 #
-# $Id: Win32Util.pm,v 1.21 2001/04/07 19:15:31 eserte Exp $
+# $Id: Win32Util.pm,v 1.22 2001/06/13 22:29:51 eserte Exp $
 # Author: Slaven Rezic
 #
 # Copyright (C) 1999, 2000, 2001 Slaven Rezic. All rights reserved.
@@ -35,7 +35,7 @@ these modules are already bundled with the popular ActivePerl package.
 use strict;
 use vars qw($DEBUG $browser_ole_obj $VERSION);
 
-$VERSION = sprintf("%d.%02d", q$Revision: 1.21 $ =~ /(\d+)\.(\d+)/);
+$VERSION = sprintf("%d.%02d", q$Revision: 1.22 $ =~ /(\d+)\.(\d+)/);
 $DEBUG=0 unless defined $DEBUG;
 
 # XXX Win-Registry-Funktionen mit Hilfe von Win32::API und
@@ -712,12 +712,23 @@ sub lwp_auto_proxy {
 	# It seems that the following formats are possible:
 	#    [http://]proxy[:port]
 	# Fix this format to the one LWP uses...
-	if ($proxy_server !~ m|^.*://|) {
-	    $proxy_server = "http://$proxy_server/";
+	# multiple Proxies are separated by ";"
+	foreach my $single_proxy (split /;/, $proxy_server) {
+	    my $proxy_for;
+	    if ($single_proxy =~ /^(ftp|http|https)=(.*)/) {
+	        $proxy_for = [$1];
+	        $single_proxy = $2;
+	    } else {
+	        $proxy_for = ['http', 'ftp'];
+	    }
+	    if ($single_proxy !~ m|^.*://|) {
+	        $single_proxy = "http://$single_proxy/";
+	    }
+	    warn "Using <$single_proxy> as LWP proxy server setting for @$proxy_for\n"
+	        if $DEBUG;
+	    $lwp_user_agent->proxy($proxy_for, $single_proxy);
 	}
-	warn "Using <$proxy_server> as LWP proxy server setting\n"
-	    if $DEBUG;
-	$lwp_user_agent->proxy(['http', 'ftp'], $proxy_server);
+
 	if (defined $proxy_override && $proxy_override eq '<local>') {
 	    # XXX There is no way to say that hosts without domain portion
 	    # should be no_proxied... So this is a poor excuse...
