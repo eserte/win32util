@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 #
-# $Id: Win32Util.pm,v 1.11 2000/07/29 01:38:03 eserte Exp $
+# $Id: Win32Util.pm,v 1.12 2000/08/29 00:46:56 eserte Exp $
 # Author: Slaven Rezic
 #
 # Copyright (C) 1999 Slaven Rezic. All rights reserved.
@@ -15,9 +15,10 @@
 package Win32Util;
 
 use strict;
-use vars qw($DEBUG $browser_ole_obj);
+use vars qw($DEBUG $browser_ole_obj $VERSION);
 
-$DEBUG=1;
+$VERSION = sprintf("%d.%02d", q$Revision: 1.12 $ =~ /(\d+)\.(\d+)/);
+$DEBUG=0;
 
 # XXX Win-Registry-Funktionen mit Hilfe von Win32::API und
 # der Hilfe von der Access-Webpage nachbilden...
