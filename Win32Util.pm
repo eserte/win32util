@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 #
-# $Id: Win32Util.pm,v 1.15 2000/12/03 18:34:13 eserte Exp $
+# $Id: Win32Util.pm,v 1.16 2000/12/11 21:45:48 eserte Exp $
 # Author: Slaven Rezic
 #
 # Copyright (C) 1999, 2000 Slaven Rezic. All rights reserved.
@@ -35,7 +35,7 @@ these modules are already bundled with the popular ActivePerl package.
 use strict;
 use vars qw($DEBUG $browser_ole_obj $VERSION);
 
-$VERSION = sprintf("%d.%02d", q$Revision: 1.15 $ =~ /(\d+)\.(\d+)/);
+$VERSION = sprintf("%d.%02d", q$Revision: 1.16 $ =~ /(\d+)\.(\d+)/);
 $DEBUG=0 unless defined $DEBUG;
 
 # XXX Win-Registry-Funktionen mit Hilfe von Win32::API und
@@ -966,7 +966,7 @@ sub path2unc {
 =head2 client_window_region($tk_window)
 
 Return maximum region for a window (without borders, title bar,
-taskbar area).
+taskbar area). Format is ($x, $y, $width, $height).
 
 =cut
 
