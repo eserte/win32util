@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 #
-# $Id: Win32Util.pm,v 1.24 2002/02/21 09:15:54 eserte Exp $
+# $Id: Win32Util.pm,v 1.25 2002/02/23 14:43:32 eserte Exp $
 # Author: Slaven Rezic
 #
 # Copyright (C) 1999, 2000, 2001 Slaven Rezic. All rights reserved.
@@ -35,7 +35,7 @@ these modules are already bundled with the popular ActivePerl package.
 use strict;
 use vars qw($DEBUG $browser_ole_obj $VERSION);
 
-$VERSION = sprintf("%d.%02d", q$Revision: 1.24 $ =~ /(\d+)\.(\d+)/);
+$VERSION = sprintf("%d.%02d", q$Revision: 1.25 $ =~ /(\d+)\.(\d+)/);
 $DEBUG=0 unless defined $DEBUG;
 
 # XXX Win-Registry-Funktionen mit Hilfe von Win32::API und
@@ -75,6 +75,9 @@ use vars qw(%API_FUNC %API_DEF);
 	    "GetUserName"          => {Lib => "advapi32",
 				       In  => ['P', 'P'],
 				       Out => 'I'},
+	    "ShowWindow"           => {Lib => "user32",
+				       In  => ['I', 'I'],
+				       Out => "I"},
 	   );
 
 sub _get_api_function {
@@ -1399,8 +1402,15 @@ not be obscured.
 
 sub maximize {
     my $top = shift;
-    my @extends = client_window_region($top);
-    $top->geometry("$extends[2]x$extends[3]+$extends[0]+$extends[1]");
+
+    my $showwindow = _get_api_function("ShowWindow");
+    if (defined $showwindow) {
+        my $SW_SHOWMAXIMIZED = 3;
+	warn $showwindow->Call(hex($top->frame), $SW_SHOWMAXIMIZED);
+    } else {
+	my @extends = client_window_region($top);
+	$top->geometry("$extends[2]x$extends[3]+$extends[0]+$extends[1]");
+    }
 }
 
 =head2 get_sys_color($what)
@@ -1490,3 +1500,4 @@ it under the same terms as Perl itself.
 =cut
 
 1;
+
