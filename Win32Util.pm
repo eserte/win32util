@@ -1,10 +1,10 @@
 # -*- perl -*-
 
 #
-# $Id: Win32Util.pm,v 1.17 2001/01/24 21:25:09 eserte Exp $
+# $Id: Win32Util.pm,v 1.18 2001/01/24 21:25:17 eserte Exp $
 # Author: Slaven Rezic
 #
-# Copyright (C) 1999, 2000 Slaven Rezic. All rights reserved.
+# Copyright (C) 1999, 2000, 2001 Slaven Rezic. All rights reserved.
 # This package is free software; you can redistribute it and/or
 # modify it under the same terms as Perl itself.
 #et
@@ -35,7 +35,7 @@ these modules are already bundled with the popular ActivePerl package.
 use strict;
 use vars qw($DEBUG $browser_ole_obj $VERSION);
 
-$VERSION = sprintf("%d.%02d", q$Revision: 1.17 $ =~ /(\d+)\.(\d+)/);
+$VERSION = sprintf("%d.%02d", q$Revision: 1.18 $ =~ /(\d+)\.(\d+)/);
 $DEBUG=0 unless defined $DEBUG;
 
 # XXX Win-Registry-Funktionen mit Hilfe von Win32::API und
