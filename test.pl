@@ -23,6 +23,10 @@ BEGIN {
 $loaded = 1;
 print "ok 1\n";
 
+use Getopt::Long;
+my $testall;
+GetOptions("testall!" => \$testall);
+
 ######################### End of black magic.
 
 # Insert your test code below (better if it prints "ok 13"
@@ -37,22 +41,55 @@ use LWP::UserAgent;my $ua = new LWP::UserAgent;
 $Win32Util::DEBUG = 1;
 Win32Util::lwp_auto_proxy($ua);
 
-__END__
+if ($testall) {
 
-package Win32Util;
+    package Win32Util;
 
-#*start_html_viewer = \&start_html_viewer_dde;
-#*start_html_viewer = \&start_html_viewer_cmd;
-#*start_ps_viewer = \&start_ps_viewer_cmd;
-#*start_ps_print = \&start_ps_print_cmd;
+    #*start_html_viewer = \&start_html_viewer_dde;
+    #*start_html_viewer = \&start_html_viewer_cmd;
+    #*start_ps_viewer = \&start_ps_viewer_cmd;
+    #*start_ps_print = \&start_ps_print_cmd;
 
-warn get_ps_viewer();
-start_ps_viewer('C:\ghost\gs4.03\tiger.ps');
-start_html_viewer('c:\users\slaven\bbbike-devel\bbbike.html');
-start_mail_composer('mailto:eserte@onlineoffice.de');
-warn get_user_folder();
-warn get_cdrom_drives();
-send_mail(-sender => 'eserte@cs.tu-berlin.de',
-	  -recipient => 'eserte@192.168.1.1',
-	  -subject => 'Eine Test-Mail mit MAPI',
-	  -body => "jfirejreg  ger\ngfhuefheirgre\nTest 1.2.3.4.....\n\ngruss slaven\n");
+    foreach my $folder_type (qw(DESKTOP
+				PROGRAMS
+				PERSONAL
+				FAVORITES
+				STARTUP
+				RECENT
+				SENDTO
+				STARTMENU
+				DESKTOPDIRECTORY
+				NETHOOD
+				FONTS
+				TEMPLATES
+				COMMON_STARTMENU
+				COMMON_PROGRAMS
+				COMMON_STARTUP
+				COMMON_DESKTOPDIRECTORY
+				APPDATA
+				PRINTHOOD
+				PROGRAM_FILES_COMMON
+			       )) {
+	warn "Folder type $folder_type: " . get_special_folder($folder_type) . "\n";
+    }
+
+    warn "Postscript viewer: " . get_ps_viewer() . "\n";
+    warn "User folder: " . get_user_folder() . "\n";
+    warn "Public program folder: " . get_program_folder() . "\n";
+    warn "Public program start menu folder: " . get_user_folder("Programs", 1) . "\n";
+    warn "All drives: " . join(", ", get_drives()) . "\n";
+    warn "Net drives: " . join(", ", get_drives('remote')) . "\n";
+    warn "Fixed drives: " . join(", ", get_drives('fixed')) . "\n";
+    warn "Removable drives: " . join(", ", get_drives('removable')) . "\n";
+    warn "CDROM drives: " . join(", ", get_drives("cdrom")) . "\n";
+    warn "CDROM drives: " . join(", ", get_cdrom_drives()) . "\n";
+    if (0) {
+	start_ps_viewer('C:\ghost\gs4.03\tiger.ps');
+	start_html_viewer('c:\users\slaven\bbbike-devel\bbbike.html');
+	start_mail_composer('mailto:eserte@onlineoffice.de');
+	send_mail(-sender => 'eserte@cs.tu-berlin.de',
+		  -recipient => 'eserte@192.168.1.1',
+		  -subject => 'Eine Test-Mail mit MAPI',
+		  -body => "jfirejreg  ger\ngfhuefheirgre\nTest 1.2.3.4.....\n\ngruss slaven\n");
+    }
+}
