@@ -1,14 +1,14 @@
 # -*- perl -*-
 
 #
-# $Id: Win32Util.pm,v 1.14 2000/08/31 21:55:06 eserte Exp $
+# $Id: Win32Util.pm,v 1.15 2000/12/03 18:34:13 eserte Exp $
 # Author: Slaven Rezic
 #
 # Copyright (C) 1999, 2000 Slaven Rezic. All rights reserved.
 # This package is free software; you can redistribute it and/or
 # modify it under the same terms as Perl itself.
-#
-# Mail: eserte@cs.tu-berlin.de
+#et
+# Mail: eserte@cs.tu-beetrlin.de
 # WWW:  http://user.cs.tu-berlin.de/~eserte/
 #
 
@@ -20,21 +20,23 @@ Win32Util - a collection of Win32 related functions
 
 =head1 SYNOPSIS
 
-    use Win32;
+    use Win32Util;
 
 =head1 DESCRIPTION
 
-XXX
-
-=head1 FUNCTIONS
+This is a collection of Win32 related functions. There are no strict
+prerequirements for this module, however, full functionality can only
+be achieved if some CPAN modules (Win32::Registry, Win32::API,
+Win32::DDE, Win32::Shortcut ...) are available. By default, most of
+these modules are already bundled with the popular ActivePerl package.
 
 =cut
 
 use strict;
 use vars qw($DEBUG $browser_ole_obj $VERSION);
 
-$VERSION = sprintf("%d.%02d", q$Revision: 1.14 $ =~ /(\d+)\.(\d+)/);
-$DEBUG=0;
+$VERSION = sprintf("%d.%02d", q$Revision: 1.15 $ =~ /(\d+)\.(\d+)/);
+$DEBUG=0 unless defined $DEBUG;
 
 # XXX Win-Registry-Funktionen mit Hilfe von Win32::API und
 # der Hilfe von der Access-Webpage nachbilden...
@@ -44,21 +46,49 @@ $DEBUG=0;
 #     SHGetSpecialFolderLocation(..., CSIDL_PROGRAMS, ...)
 # verwendet werden.
 
-#*start_html_viewer = \&start_html_viewer_dde;
-#*start_html_viewer = \&start_html_viewer_cmd;
-#*start_ps_viewer = \&start_ps_viewer_cmd;
-#*start_ps_print = \&start_ps_print_cmd;
+use vars qw(%API_FUNC %API_DEF);
 
-#warn get_ps_viewer();
-#start_ps_viewer('C:\ghost\gs4.03\tiger.ps');
-#start_html_viewer('c:\users\slaven\bbbike-devel\bbbike.html');
-#start_mail_composer('mailto:eserte@onlineoffice.de');
-#warn get_user_folder();
-#warn get_cdrom_drives();
-#send_mail(-sender => 'eserte@cs.tu-berlin.de',
-#	  -recipient => 'eserte@192.168.1.1',
-#	  -subject => 'Eine Test-Mail mit MAPI',
-#	  -body => "jfirejreg  ger\ngfhuefheirgre\nTest 1.2.3.4.....\n\ngruss slaven\n");
+%API_DEF = ("SystemParametersInfo" => {Lib => "user32",
+				       In  => ['N', 'N', 'P', 'N'],
+				       Out => 'N'},
+	    "GetSystemMetrics"     => {Lib => "user32",
+				       In  => ['N'],
+				       Out => 'N'},
+	    "SHAddToRecentDocs"    => {Lib => "shell32",
+				       In  => ['I', 'P'],
+				       Out => 'I'},
+	    "GetLogicalDrives"     => {Lib => "kernel32",
+				       In  => [],
+				       Out => "I"},
+	    "GetDriveType"         => {Lib => "kernel32",
+				       In  => ["P"],
+				       Out => "I"},
+	    "GetSysColor"          => {Lib => "user32",
+				       In  => ['N'],
+				       Out => 'N'},
+	    "GetUserName"          => {Lib => "advapi32",
+				       In  => ['P', 'P'],
+				       Out => 'I'},
+	   );
+
+sub _get_api_function {
+    my $name = shift;
+    eval {
+	require Win32::API;
+	if (!exists $API_FUNC{$name}) {
+	    my $def = $API_DEF{$name};
+	    if (!$def) {
+		die "No API definition for $name";
+	    }
+	    $API_FUNC{$name} = new Win32::API ($def->{Lib}, $name,
+					       $def->{In}, $def->{Out});
+	}
+    };
+    warn $@ if $@;
+    $API_FUNC{$name};
+}
+
+=head1 PROGRAM EXECUTION FUNCTIONS
 
 =head2 start_any_viewer($file)
 
@@ -222,49 +252,6 @@ sub get_html_viewer_dde {
     };
 }
 
-=head2 get_reg_cmd($filetype[, $opentype])
-
-Get a command from registry for $filetype. The "open" type is
-returned, except stated otherwise.
-
-=cut
-
-sub get_reg_cmd {
-    my($filetype, $opentype) = @_;
-    $opentype = 'open' if !defined $opentype;
-    my $cmd;
-    eval q{
-        use Win32::Registry;
-        my($reg_key, $key_ref, $hashref);
-        $reg_key = join('\\\\', $filetype, 'shell', $opentype, 'command');
-        return unless $main::HKEY_CLASSES_ROOT->Open($reg_key, $key_ref);
-        return unless $key_ref->GetValues($hashref);
-        $cmd = $hashref->{""}[2];
-    };
-    warn $@ if $@;
-    $cmd;
-}
-
-=head2 get_class_by_ext($ext)
-
-Return the class name for the given extension.
-
-=cut
-
-sub get_class_by_ext {
-    my $ext = shift;
-    my $class;
-    eval q{
-        use Win32::Registry;
-        my($key_ref, $hashref);
-        return unless $main::HKEY_CLASSES_ROOT->Open($ext, $key_ref);
-        return unless $key_ref->GetValues($hashref);
-        $class = $hashref->{""}[2];
-    };
-    warn $@ if $@;
-    $class;
-}
-
 =head2 start_cmd($cmd, @args...)
 
 Start an external program named $cmd. $cmd should be the full path to
@@ -336,32 +323,49 @@ $app="Netscape";# geht nur mit Netscape und nicht mit "Netscape 4.0" - warum?
     $r;
 }
 
-=head2 get_user_folder($foldertype, $public)
+=head1 EXTENSION AND MIME FUNCTIONS
 
-Get the folder path for the current user, or, if $public is set to a
-true value, for the whole system. If $foldertype is not given, the
-"Personal" subfolder is returned.
+=head2 get_reg_cmd($filetype[, $opentype])
+
+Get a command from registry for $filetype. The "open" type is
+returned, except stated otherwise.
 
 =cut
 
-sub get_user_folder {
-    my($foldertype, $public) = @_;
-    $foldertype = 'Personal' if !defined $foldertype;
-    my $folder;
+sub get_reg_cmd {
+    my($filetype, $opentype) = @_;
+    $opentype = 'open' if !defined $opentype;
+    my $cmd;
     eval q{
         use Win32::Registry;
-        my $top_hkey = ($public
-			? $main::HKEY_CURRENT_MACHINE
-			: $main::HKEY_CURRENT_USER);
         my($reg_key, $key_ref, $hashref);
-        $reg_key = join('\\\\', qw(SOFTWARE Microsoft Windows CurrentVersion
-				   Explorer), 'Shell Folders');
-        return unless $top_hkey->Open($reg_key, $key_ref);
+        $reg_key = join('\\\\', $filetype, 'shell', $opentype, 'command');
+        return unless $main::HKEY_CLASSES_ROOT->Open($reg_key, $key_ref);
         return unless $key_ref->GetValues($hashref);
-        $folder = $hashref->{$foldertype}[2];
+        $cmd = $hashref->{""}[2];
     };
     warn $@ if $@;
-    $folder;
+    $cmd;
+}
+
+=head2 get_class_by_ext($ext)
+
+Return the class name for the given extension.
+
+=cut
+
+sub get_class_by_ext {
+    my $ext = shift;
+    my $class;
+    eval q{
+        use Win32::Registry;
+        my($key_ref, $hashref);
+        return unless $main::HKEY_CLASSES_ROOT->Open($ext, $key_ref);
+        return unless $key_ref->GetValues($hashref);
+        $class = $hashref->{""}[2];
+    };
+    warn $@ if $@;
+    $class;
 }
 
 =head2 install_extension(%args)
@@ -465,6 +469,132 @@ sub install_extension {
     warn $@ if ($@);
 }
 
+=head1 USER FUNCTIONS
+
+=head2 get_user_name
+
+Get current windows user.
+
+=cut
+
+sub get_user_name {
+    _get_api_function("GetUserName");
+    return unless $API_FUNC{GetUserName};
+    my $max = 256;
+    my $maxb = pack("L", $max);
+    my $login = "\0"x$max;
+    my $b = $API_FUNC{GetUserName}->Call($login, $maxb);
+    if ($b) {
+	substr($login, 0, unpack("L", $maxb)-1);
+    } else {
+	undef;
+    }
+}
+
+=head2 is_administrator
+
+Guess if current user has admin rights.
+
+=cut
+
+sub is_administrator {
+    my $user_name = get_user_name();
+    if (defined $user_name) {
+	return $user_name =~/^(administrator|admin)$/i ? 1 : 0;
+    }
+    undef;
+}
+
+=head2 get_user_folder($foldertype, $public)
+
+Get the folder path for the current user, or, if $public is set to a
+true value, for the whole system. If $foldertype is not given, the
+"Personal" subfolder is returned.
+
+=cut
+
+sub get_user_folder {
+    my($foldertype, $public) = @_;
+    $foldertype = 'Personal' if !defined $foldertype;
+    if ($public) {
+	my $common_folders =
+	    { map { $_ => 1 }
+	      (qw/AppData Desktop Programs Startup/, 'Start Menu')
+	    };
+	if (exists $common_folders->{$foldertype}) {
+	    $foldertype = "Common $foldertype";
+	}
+    }
+    my $folder;
+    eval q{
+        use Win32::Registry;
+        my $top_hkey = ($public
+			? $main::HKEY_LOCAL_MACHINE
+			: $main::HKEY_CURRENT_USER);
+        my($reg_key, $key_ref, $hashref);
+        $reg_key = join('\\\\', qw(SOFTWARE Microsoft Windows CurrentVersion
+				   Explorer), 'Shell Folders');
+        return unless $top_hkey->Open($reg_key, $key_ref);
+        return unless $key_ref->GetValues($hashref);
+        $folder = $hashref->{$foldertype}[2];
+    };
+    warn $@ if $@;
+    $folder;
+}
+
+=head1 WWW AND NET FUNCTIONS
+
+=head2 lwp_auto_proxy($lwp_user_agent)
+
+Set the proxy for a LWP::UserAgent object (similar to the unix-centric
+env_proxy method). Uses the Internet Explorer proxy setting.
+
+=cut
+
+sub lwp_auto_proxy {
+    my $lwp_user_agent = shift;
+
+    my $proxy_server;
+    my $proxy_enable = 0;
+    my $proxy_override;
+
+    eval q{
+        use Win32::Registry;
+	my($reg_key, $key_ref, $hashref);
+        $reg_key = join('\\\\', qw/Software Microsoft Windows CurrentVersion/,
+			'Internet Settings');
+	if ($main::HKEY_CURRENT_USER->Open($reg_key, $key_ref) &&
+	    $key_ref->GetValues($hashref)) {
+	    $proxy_enable   = $hashref->{"ProxyEnable"}[2];
+	    $proxy_server   = $hashref->{"ProxyServer"}[2];
+	    $proxy_override = $hashref->{"ProxyOverride"}[2];
+	}
+    };
+
+    warn "Proxy settings from registry:
+  enable=$proxy_enable server=$proxy_server override=$proxy_override\n"
+	if $DEBUG;
+
+    if ($proxy_enable) {
+	# It seems that the following formats are possible:
+	#    [http://]proxy[:port]
+	# Fix this format to the one LWP uses...
+	if ($proxy_server !~ m|^.*://|) {
+	    $proxy_server = "http://$proxy_server/";
+	}
+	warn "Using <$proxy_server> as LWP proxy server setting\n"
+	    if $DEBUG;
+	$lwp_user_agent->proxy(['http', 'ftp'], $proxy_server);
+	if (defined $proxy_override && $proxy_override eq '<local>') {
+	    # XXX There is no way to say that hosts without domain portion
+	    # should be no_proxied... So this is a poor excuse...
+	    $lwp_user_agent->no_proxy("127.0.0.1", "localhost");
+	}
+    }
+}
+
+=head1 MAIL FUNCTIONS
+
 =head2 send_mail(%args)
 
 Send an email through MAPI. The following arguments are recognized:
@@ -505,7 +635,7 @@ sub send_mail {
     #
     my $sender = $args{-sender} or die "Sender is missing";
     my $passwd = $args{-password};
-    
+
     # Create a new MAPI Session
     #
     require Win32::OLE;
@@ -519,29 +649,29 @@ sub send_mail {
     if (!$session) {
         die "Could not create a new MAPI Session: " . Win32::OLE->LastError();
     }
-    
+
     # Attempt to log on.
     #
     my $err = $session->Logon($sender, $passwd);
     if ($err) {
         die "Logon failed: $!, " . Win32::OLE->LastError();
     }
-    
+
     # Add a new message to the Outbox.
     #
     my $msg = $session->Outbox->Messages->Add();
-    
+
     # Add the recipient.
     #
     my $rcpt = $msg->Recipients->Add();
     $rcpt->{Name} = $args{-recipient} or die "Recipient is missing";
     $rcpt->Resolve();
-    
+
     # Create a subject and a body.
     #
     $msg->{Subject} = $args{-subject} or die "Empty Message";
     $msg->{Text} = $args{-body};
-    
+
     # Send the message and log off.
     #
     $msg->Update();
@@ -550,6 +680,8 @@ sub send_mail {
 
     1;
 }
+
+=head1 EXPLORER FUNCTIONS
 
 =head2 create_shortcut(%args)
 
@@ -579,33 +711,58 @@ Specify where to save the .lnk file. If -file is not given, the file
 will be stored on the current user desktop. The filename will consist
 of the -name parameter and the .lnk extension.
 
+=item -desc
+
+Description for the file.
+
+=item -wd
+
+Working directory of this file.
+
+=item -public
+
+If true, create a shortcut visible for all users.
+
+=item -autostart
+
+Create shortlink in Autostart folder.
+
 =back
 
 =cut
 
 sub create_shortcut {
     my(%args) = @_;
-    my $path  = delete $args{-path} || die "Missing -path parameter";
-    my $args  = delete $args{-args};
-    my $icon  = delete $args{-icon};
-    my $name  = delete $args{-name} || die "Missing -name parameter";
-    my $file  = delete $args{-file};
+    my $path   = delete $args{-path} || die "Missing -path parameter";
+    my $args   = delete $args{-args};
+    my $icon   = delete $args{-icon};
+    my $name   = delete $args{-name} || die "Missing -name parameter";
+    my $file   = delete $args{-file};
+    my $desc   = delete $args{-desc};
+    my $wd     = delete $args{-wd};
+    my $public = delete $args{-public} || 0;
+    my $autostart = delete $args{-autostart} || 0;
 
     eval q{
         use Win32::Shortcut;
 
 	if (!defined $file) {
-	    my $desktop = get_user_folder("Desktop");
-	    if (!defined $desktop) {
-		die "Can't get Desktop directory";
+	    my $dir;
+	    $dir = get_user_folder(($autostart ? "Startup" : "Desktop"),
+				   $public);
+	    if (!defined $dir) {
+		die "Can't get Desktop or Startup directory";
 	    }
-	    $file = join('\\\\', $desktop, "$name.lnk");
+warn $dir."\n";
+	    $file = join('\\\\', $dir, "$name.lnk");
 	}
 
         my $scut = new Win32::Shortcut;
-        $scut->{Path} = $path;
-        $scut->{Arguments} = $args if defined $args;
-        $scut->{IconLocation} = $icon if defined $icon;
+        $scut->{Path}		   = $path;
+	$scut->{Arguments}	   = $args if defined $args;
+	$scut->{IconLocation}      = $icon if defined $icon;
+	$scut->{Description}	   = $desc if defined $desc;
+	$scut->{WorkingDirectory}  = $wd   if defined $wd;
         foreach my $key (keys %args) {
             $scut->{$key} = $args{$key};
         }
@@ -637,6 +794,10 @@ Specify where to save the .lnk file. If -file is not given, the file
 will be stored on the current user desktop. The filename will consist
 of the -url parameter and the .lnk extension.
 
+=item -desc
+
+Description for the file (not used yet).
+
 =back
 
 =cut
@@ -647,10 +808,12 @@ sub create_internet_shortcut {
     my $icon  = delete $args{-icon};
     my $name  = delete $args{-name} || die "Missing -name parameter";
     my $file  = delete $args{-file};
+    my $desc  = delete $args{-desc};
+    my $public = delete $args{-public} || 0;
 
     eval q{
         if (!defined $file) {
-            my $desktop = get_user_folder("Desktop");
+            my $desktop = get_user_folder("Desktop", $public);
             if (!defined $desktop) {
     	        die "Can't get Desktop directory";
 	    }
@@ -712,6 +875,8 @@ as an argument for create_shortcut.
 If true, create a program group in the public section, not in the user
 section of the start menu.
 
+=back
+
 =cut
 
 sub create_program_group {
@@ -750,6 +915,8 @@ sub create_program_group {
     };
     warn $@ if $@;
 }
+
+=head1 FILE SYSTEM FUNCTIONS
 
 =head2 get_cdrom_drives
 
@@ -794,41 +961,7 @@ sub path2unc {
     }
 }
 
-use vars qw(%API_FUNC %API_DEF);
-
-%API_DEF = ("SystemParametersInfo" => {Lib => "user32",
-				       In  => ['N', 'N', 'P', 'N'],
-				       Out => 'N'},
-	    "GetSystemMetrics"     => {Lib => "user32",
-				       In  => ['N'],
-				       Out => 'N'},
-	    "SHAddToRecentDocs"    => {Lib => "shell32",
-				       In  => ['I', 'P'],
-				       Out => 'I'},
-	    "GetLogicalDrives"     => {Lib => "kernel32",
-				       In  => [],
-				       Out => "I"},
-	    "GetDriveType"         => {Lib => "kernel32",
-				       In  => ["P"],
-				       Out => "I"},
-	   );
-
-sub _get_api_function {
-    my $name = shift;
-    eval {
-	require Win32::API;
-	if (!exists $API_FUNC{$name}) {
-	    my $def = $API_DEF{$name};
-	    if (!$def) {
-		die "No API definition for $name";
-	    }
-	    $API_FUNC{$name} = new Win32::API ($def->{Lib}, $name,
-					       $def->{In}, $def->{Out});
-	}
-    };
-    #warn $@ if $@;
-    $API_FUNC{$name};
-}
+=head1 GUI FUNCTIONS
 
 =head2 client_window_region($tk_window)
 
@@ -911,6 +1044,55 @@ sub maximize {
     $top->geometry("$extends[2]x$extends[3]+$extends[0]+$extends[1]");
 }
 
+=head2 get_sys_color($what)
+
+Return ($r,$g,$b) values from 0 to 255 for the requested system color.
+
+=cut
+
+sub get_sys_color {
+    my $type = shift;
+    my $name2number =
+    {"scrollbar"	    => 0,
+     "background"	    => 1,
+     "activecaption"	    => 2,
+     "inactivecaption"	    => 3,
+     "menu"		    => 4,
+     "window"		    => 5,
+     "windowframe"	    => 6,
+     "menutext"		    => 7,
+     "windowtext"	    => 8,
+     "captiontext"	    => 9,
+     "activeborder"	    => 10,
+     "inactiveborder"	    => 11,
+     "appworkspace"	    => 12,
+     "highlight"	    => 13,
+     "highlighttext"	    => 14,
+     "btnface"		    => 15,
+     "btnshadow"	    => 16,
+     "graytext"		    => 17,
+     "btntext"		    => 18,
+     "inactivecaptiontext"  => 19,
+     "btnhighlight"	    => 20,
+     "3ddkshadow"	    => 21,
+     "3dlight"		    => 22,
+     "infotext"		    => 23,
+     "infobk"		    => 24,
+    };
+    my $number = $name2number->{$type};
+    return unless defined $number;
+    _get_api_function("GetSysColor");
+    return unless $API_FUNC{GetSysColor};
+    my $i = $API_FUNC{GetSysColor}->Call($number);
+    my($r,$g,$b);
+    $b = $i >> 16;
+    $g = ($i >> 8) & 0xff;
+    $r = $i & 0xff;
+    ($r, $g, $b);
+}
+
+=head1 MISC FUNCTIONS
+
 =head2 sort_cmp_hack($a,$b)
 
 "use locale" does not work on Windows. This is a hack to be used in
@@ -930,7 +1112,7 @@ sub sort_cmp_hack {
 L<perlwin32|perlwin32>, L<Win32::API|Win32::API>,
 L<Win32::OLE|Win32::OLE>, L<Win32::Registry|Win32::Registry>,
 L<Win32::Process|Win32::Process>, L<Win32::DDE|Win32::DDE>,
-L<Win32::Shortcut|Win32::Shortcut>, L<Tk|Tk>.
+L<Win32::Shortcut|Win32::Shortcut>, L<Tk|Tk>, L<LWP::UserAgent>.
 
 =head1 AUTHOR
 
