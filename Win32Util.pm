@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 #
-# $Id: Win32Util.pm,v 1.16 2000/12/11 21:45:48 eserte Exp $
+# $Id: Win32Util.pm,v 1.17 2001/01/24 21:25:09 eserte Exp $
 # Author: Slaven Rezic
 #
 # Copyright (C) 1999, 2000 Slaven Rezic. All rights reserved.
@@ -35,7 +35,7 @@ these modules are already bundled with the popular ActivePerl package.
 use strict;
 use vars qw($DEBUG $browser_ole_obj $VERSION);
 
-$VERSION = sprintf("%d.%02d", q$Revision: 1.16 $ =~ /(\d+)\.(\d+)/);
+$VERSION = sprintf("%d.%02d", q$Revision: 1.17 $ =~ /(\d+)\.(\d+)/);
 $DEBUG=0 unless defined $DEBUG;
 
 # XXX Win-Registry-Funktionen mit Hilfe von Win32::API und
@@ -233,11 +233,38 @@ sub get_ps_print {
     my $class = get_class_by_ext(".ps") || "psfile";
     get_reg_cmd($class, "print");
 }
-sub get_mail_composer { get_reg_cmd("mailto") }
-# weitere Mail-Composer-Einträge in der Registry:
-# HKEY_LOCAL_MACHINE\Clients\mail\Netscape Messenger\Protocols\mailto\shell\open\command => Path to mailprg
-# HKEY_LOCAL_MACHINE\Clients\mail\Pegasus Mail\Protocols\mailto\shell\open\command => Path to mailprg
-# HKEY_LOCAL_MACHINE\Clients\mail\Pegasus Mail\Shell\open\command => Path to mailprg
+sub get_mail_composer {
+    my $cmd = get_reg_cmd("mailto");
+    if ($cmd) {
+	return $cmd;
+    } else {
+	eval <<'EOF';
+	   use Win32::Registry;
+	   my($key_ref, $key_ref2);
+	   my $root = "SOFTWARE\\Clients\\Mail";
+	   return unless $main::HKEY_LOCAL_MACHINE->Open($root, $key_ref);
+	   my $key_ref2 = [];
+	   return unless $key_ref->GetKeys($key_ref2);
+	   my $clients = [@$key_ref2];
+	   my $hashref;
+	   if ($key_ref->GetValues($hashref)) {
+	   	unshift @$clients, $hashref->{""}[2]; # default mailer
+	   }
+	   foreach my $client (@$clients) {
+	       if ($main::HKEY_LOCAL_MACHINE->Open("$root\\$client\\Protocols\\mailto\\shell\\open\\command", $key_ref)) {
+	       	   my $hashref;
+	           if ($key_ref->GetValues($hashref)) {
+		       $cmd = $hashref->{""}[2];
+		       last;
+	           }
+	       }
+	   }
+EOF
+	warn $@ if $@;
+	return $cmd if defined $cmd;
+	die "Can't send mail";
+    }
+}
 
 sub get_html_viewer_dde {
     eval q{
@@ -597,7 +624,8 @@ sub lwp_auto_proxy {
 
 =head2 send_mail(%args)
 
-Send an email through MAPI. The following arguments are recognized:
+Send an email through MAPI or other means. Some of the following
+arguments are recognized:
 
 =over 4
 
@@ -629,6 +657,11 @@ my system.
 =cut
 
 sub send_mail {
+    my(%args) = @_;
+    send_mapi_mail(%args);
+}
+
+sub send_mapi_mail {
     my(%args) = @_;
 
     # Sender's Name and Password
