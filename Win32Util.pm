@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 #
-# $Id: Win32Util.pm,v 1.7 1999/06/29 00:11:03 eserte Exp $
+# $Id: Win32Util.pm,v 1.8 1999/08/06 07:59:38 eserte Exp $
 # Author: Slaven Rezic
 #
 # Copyright (C) 1999 Slaven Rezic. All rights reserved.
@@ -22,17 +22,27 @@ $DEBUG=1;
 # XXX Win-Registry-Funktionen mit Hilfe von Win32::API und
 # der Hilfe von der Access-Webpage nachbilden...
 
+# Laut Microsoft-Dokumentation soll für den Ort des Programm-Verzeichnisses
+# die Funktion
+#     SHGetSpecialFolderLocation(..., CSIDL_PROGRAMS, ...)
+# verwendet werden.
+
 #*start_html_viewer = \&start_html_viewer_dde;
 #*start_html_viewer = \&start_html_viewer_cmd;
 #*start_ps_viewer = \&start_ps_viewer_cmd;
 #*start_ps_print = \&start_ps_print_cmd;
 
 #warn get_ps_viewer();
-#start_ps_viewer('G:\ghost\gs4.03\tiger.ps');
-#start_html_viewer('e:\slaven\bbbike-2.58\bbbike.html');
-#start_mail_composer('eserte@onlineoffice.de');
+#start_ps_viewer('C:\ghost\gs4.03\tiger.ps');
+#start_html_viewer('c:\users\slaven\bbbike-devel\bbbike.html');
+#start_mail_composer('mailto:eserte@onlineoffice.de');
 #warn get_user_folder();
 #warn get_cdrom_drives();
+
+#send_mail(-sender => 'eserte@cs.tu-berlin.de',
+#	  -recipient => 'slaven.rezic@berlin.de',
+#	  -subject => 'Eine Test-Mail mit MAPI',
+#	  -body => "jfirejreg  ger\ngfhuefheirgre\nTest 1.2.3.4.....\n\ngruss slaven\n");
 
 sub start_html_viewer {
     my $file = shift;
@@ -274,6 +284,61 @@ sub install_extension {
 	}
     };
     warn $@ if ($@);
+}
+
+# This is from Win32 FAQ
+# nicht ausgetestet, wegen mangels an MAPI (?)
+sub send_mail {
+    my(%args) = @_;
+
+    # Sender's Name and Password
+    #
+    my $sender = $args{-sender} or die "Sender is missing";
+    my $passwd = $args{-password};
+    
+    # Create a new MAPI Session
+    #
+    require Win32::OLE;
+    my $session;
+    foreach my $mapiclass ("MAPI.Session",
+			   #"MSMAPI.MAPISession"
+			   ) {
+	$session = Win32::OLE->new($mapiclass);
+	last if ($session);
+    }
+    if (!$session) {
+        die "Could not create a new MAPI Session: " . Win32::OLE->LastError();
+    }
+    
+    # Attempt to log on.
+    #
+    my $err = $session->Logon($sender, $passwd);
+    if ($err) {
+        die "Logon failed: $!, " . Win32::OLE->LastError();
+    }
+    
+    # Add a new message to the Outbox.
+    #
+    my $msg = $session->Outbox->Messages->Add();
+    
+    # Add the recipient.
+    #
+    my $rcpt = $msg->Recipients->Add();
+    $rcpt->{Name} = $args{-recipient} or die "Recipient is missing";
+    $rcpt->Resolve();
+    
+    # Create a subject and a body.
+    #
+    $msg->{Subject} = $args{-subject} or die "Empty Message";
+    $msg->{Text} = $args{-body};
+    
+    # Send the message and log off.
+    #
+    $msg->Update();
+    $msg->Send(0, 0, 0);
+    $session->Logoff();
+
+    1;
 }
 
 # Argumente:
