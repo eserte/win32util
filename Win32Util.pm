@@ -1,15 +1,15 @@
 # -*- perl -*-
 
 #
-# $Id: Win32Util.pm,v 1.25 2002/02/23 14:43:32 eserte Exp $
+# $Id: Win32Util.pm,v 1.26 2003/01/07 20:13:14 eserte Exp $
 # Author: Slaven Rezic
 #
-# Copyright (C) 1999, 2000, 2001 Slaven Rezic. All rights reserved.
+# Copyright (C) 1999-2003 Slaven Rezic. All rights reserved.
 # This package is free software; you can redistribute it and/or
 # modify it under the same terms as Perl itself.
-#et
-# Mail: eserte@cs.tu-beetrlin.de
-# WWW:  http://user.cs.tu-berlin.de/~eserte/
+#
+# Mail: slaven@rezic.de
+# WWW:  http://www.rezic.de/eserte/
 #
 
 package Win32Util;
@@ -35,7 +35,7 @@ these modules are already bundled with the popular ActivePerl package.
 use strict;
 use vars qw($DEBUG $browser_ole_obj $VERSION);
 
-$VERSION = sprintf("%d.%02d", q$Revision: 1.25 $ =~ /(\d+)\.(\d+)/);
+$VERSION = sprintf("%d.%02d", q$Revision: 1.26 $ =~ /(\d+)\.(\d+)/);
 $DEBUG=0 unless defined $DEBUG;
 
 # XXX Win-Registry-Funktionen mit Hilfe von Win32::API und
@@ -78,6 +78,21 @@ use vars qw(%API_FUNC %API_DEF);
 	    "ShowWindow"           => {Lib => "user32",
 				       In  => ['I', 'I'],
 				       Out => "I"},
+	    "DrawMenuBar"          => {Lib => "user32",
+				       In  => ['N'],
+				       Out => 'N'},
+	    "GetMenuItemCount"     => {Lib => 'user32',
+				       In  => ['N'],
+				       Out => 'N'},
+	    "GetMenuItemID"        => {Lib => 'user32',
+				       In  => ['N','N'],
+				       Out => 'N'},
+	    "GetSystemMenu"        => {Lib => 'user32',
+				       In  => ['N','N'],
+				       Out => 'N'},
+	    "RemoveMenu"           => {Lib => 'user32',
+				       In  => ['N','N','N'],
+				       Out => 'N'},
 	   );
 
 sub _get_api_function {
@@ -487,7 +502,7 @@ sub install_extension {
 	    $icon_reg->SetValue("", REG_SZ, $icon);
 	}
 	my $shell_reg;
-	if (defined $open && defined $print) {
+	if (defined $open || defined $print) {
 	    $name_reg->Create("shell", $shell_reg);
 	}
 	if (defined $open) {
@@ -621,19 +636,19 @@ Get current windows user.
 
 sub get_user_name {
     my(%args) = @_;
-    
+
     # first try the domain user
     if ($args{-full}) {
     	my $server = get_domain_server();
     	if (defined $server) {
 	    my $userinfo = {};
-	    Win32API::Net::UserGetInfo($server, Win32::LoginName, 2, $userinfo);
+	    Win32API::Net::UserGetInfo($server, Win32::LoginName(), 2, $userinfo);
 	    if ($userinfo) {
 	        return $userinfo->{fullName};
 	    }
 	}
     }
-    
+
     _get_api_function("GetUserName");
     if (!$API_FUNC{GetUserName}) {
 	return Win32::LoginName();
@@ -814,7 +829,7 @@ sub get_home_dir {
     my $server = get_domain_server();
     if (defined $server) {
     	my($userinfo) = {};
-	Win32API::Net::UserGetInfo($server, Win32::LoginName, 2, $userinfo);
+	Win32API::Net::UserGetInfo($server, Win32::LoginName(), 2, $userinfo);
 	if ($userinfo) {
 	    return $userinfo->{homeDir};
 	}
@@ -1233,7 +1248,7 @@ Return a list of CDROM drives on the system.
 
 =cut
 
-sub get_cdrom_drives {
+sub XXX_get_cdrom_drives {
     my @drives;
     eval q{
 	my $DRIVE_CDROM = 5;
@@ -1460,6 +1475,44 @@ sub get_sys_color {
     ($r, $g, $b);
 }
 
+=head2 disable_dosbox_close_button()
+
+As the function name says :-). Derived from a posting from Jack D.
+
+NOT YET TESTED!
+
+=cut
+
+sub disable_dosbox_close_button {
+    require Win32::GUI;
+    use constant MF_BYCOMMAND => 0;
+    # Get DOS window handle..
+    my $hWnd = Win32::GUI::GetPerlWindow();
+    die "Can't get perl window" if !$hWnd;
+    # Get System menu associated with IE Window handle..
+    my $hMenu = $API_FUNC{GetSystemMenu}->Call($hWnd, 0);
+    if ($hMenu) {
+	# Obtain the number of items in the menu
+	my $menuItemCount = $API_FUNC{GetMenuItemCount}->Call($hMenu);
+
+	# Remove the Close menu item  from the menu
+	# The close item has an ID of 61536. Menu is zero-based so last
+	# menu item is actually the Menu Item Count - 1.
+
+	for (my $i = $menuItemCount-1; $i >= 0; $i--) {
+	    my $ID = $API_FUNC{GetMenuItemID}->Call($hMenu, $i);
+	    if ($ID == 61536) {
+		$API_FUNC{RemoveMenu}->Call($hMenu, $ID, MF_BYCOMMAND);
+		warn "Removing $ID ",Win32::FormatMessage(Win32::GetLastError());#XXX remove debug comment
+	    }
+	}
+
+	# Force a redraw of the menu.
+	# This will refresh the titlebar and disable the 'X' button
+	$API_FUNC{DrawMenuBar}->Call($hWnd);
+    }
+}
+
 =head1 MISC FUNCTIONS
 
 =head2 sort_cmp_hack($a,$b)
@@ -1489,15 +1542,14 @@ L<Win32::Shortcut|Win32::Shortcut>, L<Tk|Tk>, L<LWP::UserAgent>.
 
 =head1 AUTHOR
 
-Slaven Rezic <eserte@cs.tu-berlin.de>
+Slaven Rezic <slaven@rezic.de>
 
 =head1 COPYRIGHT
 
-Copyright (c) 1999, 2000 Slaven Rezic. All rights reserved.
+Copyright (c) 1999, 2000, 2001, 2002 Slaven Rezic. All rights reserved.
 This module is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself.
 
 =cut
 
 1;
-
