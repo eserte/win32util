@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 #
-# $Id: Win32Util.pm,v 1.18 2001/01/24 21:25:17 eserte Exp $
+# $Id: Win32Util.pm,v 1.19 2001/02/02 02:22:33 eserte Exp $
 # Author: Slaven Rezic
 #
 # Copyright (C) 1999, 2000, 2001 Slaven Rezic. All rights reserved.
@@ -35,7 +35,7 @@ these modules are already bundled with the popular ActivePerl package.
 use strict;
 use vars qw($DEBUG $browser_ole_obj $VERSION);
 
-$VERSION = sprintf("%d.%02d", q$Revision: 1.18 $ =~ /(\d+)\.(\d+)/);
+$VERSION = sprintf("%d.%02d", q$Revision: 1.19 $ =~ /(\d+)\.(\d+)/);
 $DEBUG=0 unless defined $DEBUG;
 
 # XXX Win-Registry-Funktionen mit Hilfe von Win32::API und
@@ -217,6 +217,9 @@ Start a mail composer with $mailaddr as the recipient.
 
 sub start_mail_composer {
     my $mailaddr = shift;
+    if ($mailaddr !~ /^mailto:/) {
+	$mailaddr = "mailto:$mailaddr";
+    }
     my $mailto_cmd = get_mail_composer();
     start_cmd($mailto_cmd, $mailaddr);
 }
