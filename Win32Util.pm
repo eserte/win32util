@@ -5,6 +5,9 @@ use vars qw($DEBUG);
 
 $DEBUG=1;
 
+# XXX Win-Registry-Funktionen mit Hilfe von Win32::API und
+# der Hilfe von der Access-Webpage nachbilden...
+
 #*start_html_viewer = \&start_html_viewer_dde;
 #*start_html_viewer = \&start_html_viewer_cmd;
 #*start_ps_viewer = \&start_ps_viewer_cmd;
@@ -15,6 +18,7 @@ $DEBUG=1;
 #start_html_viewer('F:\perl5005\5.005\html\index.html') if $DEBUG;
 #start_mail_composer('eserte@onlineoffice.de');
 #warn get_user_folder();
+#warn get_cdrom_drives();
 
 sub start_html_viewer {
     my $file = shift;
@@ -131,7 +135,8 @@ sub start_cmd {
     eval q{
         use Win32::Process;
         my $proc;
-        $r = Win32::Process::Create($proc, $appname, $cmdline, 0, NORMAL_PRIORITY_CLASS, ".");
+        $r = Win32::Process::Create($proc, $appname, $cmdline,
+				    0, NORMAL_PRIORITY_CLASS, ".");
     };
     if ($@) { # try Win32::Spawn (built-in)
         use Win32;
@@ -147,7 +152,7 @@ sub start_dde {
     eval q{
         use Win32::DDE::Client;
 # XXX
-$app="Netscape";# geht nur mit Netscape und nicht mit "Netscape 4.0"
+$app="Netscape";# geht nur mit Netscape und nicht mit "Netscape 4.0" - warum?
         my $dde = new Win32::DDE::Client($app, $topic);
         warn "DDE Client with $app and $topic: $dde\n" if $DEBUG;
         if ($dde->Error) {
@@ -161,14 +166,18 @@ $app="Netscape";# geht nur mit Netscape und nicht mit "Netscape 4.0"
 }
 
 sub get_user_folder {
-    my($foldertype) = @_;
+    my($foldertype, $public) = @_;
     $foldertype = 'Personal' if !defined $foldertype;
     my $folder;
     eval q{
         use Win32::Registry;
+        my $top_hkey = ($public 
+			? $main::HKEY_CURRENT_MACHINE
+			: $main::HKEY_CURRENT_USER);
         my($reg_key, $key_ref, $hashref);
-        $reg_key = join('\\\\', qw(SOFTWARE Microsoft Windows CurrentVersion Explorer), 'Shell Folders'); 
-        return unless $main::HKEY_CURRENT_USER->Open($reg_key, $key_ref);
+        $reg_key = join('\\\\', qw(SOFTWARE Microsoft Windows CurrentVersion
+				   Explorer), 'Shell Folders'); 
+        return unless $top_hkey->Open($reg_key, $key_ref);
         return unless $key_ref->GetValues($hashref);
         $folder = $hashref->{$foldertype}[2];
     };
@@ -180,11 +189,7 @@ sub install_extension {
     my(%args) = @_;
     my $ext  = $args{-extension} or die "Missing -extension parameter";
     my @ext;
-    if (ref $ext eq 'ARRAY') {
-        push @ext, @$ext;
-    } else {
-        push @ext, $ext;
-    }
+    push @ext, (ref $ext eq 'ARRAY' ? @$ext : $ext);
     foreach my $ext (@ext) {
         if ($ext !~ /^\./) {
 	    warn "Extension $ext does not start with dot";
@@ -220,22 +225,30 @@ sub install_extension {
     warn $@ if ($@);
 }
 
+# Argumente:
+# -path: Pfad zum Programm (erforderlich)
+# -args: zusätzliche Argumente
+# -icon: Pfad zur .ico-Datei
+# -name: Titel des Programms (erforderlich)
+# -file: Pfad, wo die .lnk-Datei abgespeichert werden soll
 sub create_shortcut {
     my(%args) = @_;
-    my $path = delete $args{-path} || die "Missing -path parameter";
-    my $args = delete $args{-args};
-    my $icon = delete $args{-icon};
-    my $name = delete $args{-name} || die "Missing -name parameter";
+    my $path  = delete $args{-path} || die "Missing -path parameter";
+    my $args  = delete $args{-args};
+    my $icon  = delete $args{-icon};
+    my $name  = delete $args{-name} || die "Missing -name parameter";
+    my $file  = delete $args{-file};
         
     eval q{
         use Win32::Shortcut;
 
-	my $desktop = get_user_folder("Desktop");
-	if (!defined $desktop) {
-	    die "Can't get Desktop directory";
+	if (!defined $file) {
+	    my $desktop = get_user_folder("Desktop");
+	    if (!defined $desktop) {
+		die "Can't get Desktop directory";
+	    }
+	    $file = join('\\\\', $desktop, "$name.lnk");
 	}
-	
-        my $file = join('\\\\', $desktop, "$name.lnk");   
 
         my $scut = new Win32::Shortcut;
         $scut->{Path} = $path;
@@ -254,10 +267,71 @@ sub add_recent_doc {
     my $doc = shift;
     eval q{
         use Win32::API;
-        my $addtorecentdocs = new Win32::API("shell32", "SHAddToRecentDocs", ["I", "P"], "I");
+        my $addtorecentdocs = new Win32::API("shell32", "SHAddToRecentDocs",
+					     ["I", "P"], "I");
         $addtorecentdocs->Call(2, $doc);
     };
     warn $@ if $@;
+}
+
+# Argument -files:
+#   entweder nur ein Dateiname oder Array mit mehreren Dateinamen
+#   jeder Dateiname kann in der Form {-path => 'path', -name => 'name'} sein,
+#   wobei dieses Hash als Argument für create_shortcut verwendet wird.
+sub create_program_group {
+    my(%args) = @_;
+    my $parent = delete $args{-parent} or die "Missing -parent parameter";
+    my $files  = delete $args{-files} or die "Missing -files parameter";
+    my $public = delete $args{-public} || 0;
+    my @files;
+    push @files, (ref $files eq 'ARRAY' ? @$files : $files);
+    eval q{
+	use File::Path;
+	use File::Basename;
+	my $progdir = get_user_folder("Programs", $public);
+	die "Can't get user folder." if !$progdir;
+	my $topdir  = "$progdir/$parent"; 
+	if (!-d $topdir) {
+	    mkpath([$topdir], 0, 0755);
+	}
+	foreach my $file (@files) {
+	    my %shortcut_args;
+	    if (ref $file eq 'HASH') {
+		%shortcut_args = %$file;
+	    } else {
+		%shortcut_args = (-path => $file,
+				  -name => basename($file),
+				 );
+	    }
+	    $shortcut_args{-file} = "$topdir/$shortcut_args{-name}.lnk";
+	    create_shortcut(%shortcut_args);
+	}
+    };
+    warn $@ if $@;
+}
+
+sub get_cdrom_drives {
+    my @drives;
+    eval q{
+	use Win32::API;
+	my $DRIVE_CDROM = 5;
+	my $MAX_DOS_DRIVES = 26;
+        my $getlogicaldrives = new Win32::API("kernel32", "GetLogicalDrives",
+					      [], "I");
+        my $getdrivetype = new Win32::API("kernel32", "GetDriveType",
+					  ["P"], "I");
+        my $drives = $getlogicaldrives->Call();
+	my @drive_bits = split(//, unpack("b*", pack("L", $drives))); # XXX V statt L?
+	for my $i (0 .. $MAX_DOS_DRIVES-1) {
+	    if ($drive_bits[$i]) {
+		my $drive_name = chr($i + ord('A')) . ":";
+		my $drive_type = $getdrivetype->Call($drive_name);
+		push @drives, $drive_name if ($drive_type == $DRIVE_CDROM);
+	    }
+	}
+    };
+    warn $@ if $@;
+    @drives;
 }
 
 1;
