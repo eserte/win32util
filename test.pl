@@ -32,7 +32,10 @@ print "ok 1\n";
 #warn join(", ", Win32Util::get_sys_color("activecaption"));
 #warn Win32Util::get_user_folder("Programs", 1);
 #warn Win32Util::get_user_folder("Desktop", 1);
-warn Win32Util::get_user_name();
+#warn Win32Util::get_user_name();
+use LWP::UserAgent;my $ua = new LWP::UserAgent;
+$Win32Util::DEBUG = 1;
+Win32Util::lwp_auto_proxy($ua);
 
 __END__
 
