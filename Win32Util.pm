@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 #
-# $Id: Win32Util.pm,v 1.9 1999/12/18 14:35:55 eserte Exp $
+# $Id: Win32Util.pm,v 1.10 2000/03/04 16:32:12 eserte Exp $
 # Author: Slaven Rezic
 #
 # Copyright (C) 1999 Slaven Rezic. All rights reserved.
@@ -38,9 +38,8 @@ $DEBUG=1;
 #start_mail_composer('mailto:eserte@onlineoffice.de');
 #warn get_user_folder();
 #warn get_cdrom_drives();
-
 #send_mail(-sender => 'eserte@cs.tu-berlin.de',
-#	  -recipient => 'slaven.rezic@berlin.de',
+#	  -recipient => 'eserte@192.168.1.1',
 #	  -subject => 'Eine Test-Mail mit MAPI',
 #	  -body => "jfirejreg  ger\ngfhuefheirgre\nTest 1.2.3.4.....\n\ngruss slaven\n");
 
@@ -214,7 +213,6 @@ sub start_cmd {
 				    0, NORMAL_PRIORITY_CLASS, ".");
     };
     if ($@) { # try Win32::Spawn (built-in)
-        #use Win32; # XXX not needed
         my $pid;
         $r = Win32::Spawn($appname, $cmdline, $pid);
     }
