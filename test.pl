@@ -29,9 +29,12 @@ print "ok 1\n";
 # (correspondingly "not ok 13") depending on the success of chunk 13
 # of the test code):
 
-warn Win32Util::get_user_name();
+warn join(", ", Win32Util::get_sys_color("activecaption"));
+warn Win32Util::get_user_folder("Programs", 1);
+warn Win32Util::get_user_folder("Desktop", 1);
+#warn Win32Util::get_user_name();
 
-exit;
+__END__
 
 package Win32Util;
 
