@@ -1,10 +1,10 @@
 # -*- perl -*-
 
 #
-# $Id: Win32Util.pm,v 1.13 2000/08/29 17:29:21 eserte Exp $
+# $Id: Win32Util.pm,v 1.14 2000/08/31 21:55:06 eserte Exp $
 # Author: Slaven Rezic
 #
-# Copyright (C) 1999 Slaven Rezic. All rights reserved.
+# Copyright (C) 1999, 2000 Slaven Rezic. All rights reserved.
 # This package is free software; you can redistribute it and/or
 # modify it under the same terms as Perl itself.
 #
@@ -14,10 +14,26 @@
 
 package Win32Util;
 
+=head1 NAME
+
+Win32Util - a collection of Win32 related functions
+
+=head1 SYNOPSIS
+
+    use Win32;
+
+=head1 DESCRIPTION
+
+XXX
+
+=head1 FUNCTIONS
+
+=cut
+
 use strict;
 use vars qw($DEBUG $browser_ole_obj $VERSION);
 
-$VERSION = sprintf("%d.%02d", q$Revision: 1.13 $ =~ /(\d+)\.(\d+)/);
+$VERSION = sprintf("%d.%02d", q$Revision: 1.14 $ =~ /(\d+)\.(\d+)/);
 $DEBUG=0;
 
 # XXX Win-Registry-Funktionen mit Hilfe von Win32::API und
@@ -44,6 +60,12 @@ $DEBUG=0;
 #	  -subject => 'Eine Test-Mail mit MAPI',
 #	  -body => "jfirejreg  ger\ngfhuefheirgre\nTest 1.2.3.4.....\n\ngruss slaven\n");
 
+=head2 start_any_viewer($file)
+
+Based on extension of the given $file, start the appropriate viewer.
+
+=cut
+
 sub start_any_viewer {
     my $file = shift;
     require File::Basename;
@@ -68,6 +90,12 @@ sub start_any_viewer {
     0;
 }
 
+=head2 start_html_viewer($file)
+
+Start a html viewer with the given file. This is mostly a WWW browser.
+
+=cut
+
 sub start_html_viewer {
     my $file = shift;
     if (!start_html_viewer_cmd($file)) {
@@ -89,6 +117,12 @@ sub start_html_viewer_cmd {
     start_cmd($html_viewer, $file);
 }
 
+=head2 start_ps_viewer($file)
+
+Start a postscript viewer with the given file.
+
+=cut
+
 sub start_ps_viewer {
     my $file = shift;
     if (!start_ps_viewer_cmd($file)) {
@@ -103,6 +137,12 @@ sub start_ps_viewer_cmd {
     my $ps_viewer = get_ps_viewer();
     start_cmd($ps_viewer, $file);
 }
+
+=head2 start_ps_print($file)
+
+Print a postscript file via a postscript viewer.
+
+=cut
 
 sub start_ps_print {
     my $file = shift;
@@ -127,7 +167,7 @@ sub start_html_viewer_dde {
 
 # XXX change to use IE or NS
 # XXX Test it...
-# Return a Win32::OLE object. With the 
+# Return a Win32::OLE object. With the XXX
 sub show_browser_file {
     require Win32::OLE ;
     my $file = shift;
@@ -139,10 +179,16 @@ sub show_browser_file {
     }
 }
 
+=head2 start_mail_composer($mailaddr)
+
+Start a mail composer with $mailaddr as the recipient.
+
+=cut
+
 sub start_mail_composer {
-    my $mailadr = shift;
+    my $mailaddr = shift;
     my $mailto_cmd = get_mail_composer();
-    start_cmd($mailto_cmd, $mailadr);
+    start_cmd($mailto_cmd, $mailaddr);
 }
 
 sub get_html_viewer {
@@ -176,6 +222,13 @@ sub get_html_viewer_dde {
     };
 }
 
+=head2 get_reg_cmd($filetype[, $opentype])
+
+Get a command from registry for $filetype. The "open" type is
+returned, except stated otherwise.
+
+=cut
+
 sub get_reg_cmd {
     my($filetype, $opentype) = @_;
     $opentype = 'open' if !defined $opentype;
@@ -192,6 +245,12 @@ sub get_reg_cmd {
     $cmd;
 }
 
+=head2 get_class_by_ext($ext)
+
+Return the class name for the given extension.
+
+=cut
+
 sub get_class_by_ext {
     my $ext = shift;
     my $class;
@@ -205,6 +264,14 @@ sub get_class_by_ext {
     warn $@ if $@;
     $class;
 }
+
+=head2 start_cmd($cmd, @args...)
+
+Start an external program named $cmd. $cmd should be the full path to
+the executable. @args are passed to the program. The program is
+spawned, that is, executed in the background.
+
+=cut
 
 sub start_cmd {
     my($fullcmd, @args) = @_;
@@ -244,6 +311,12 @@ sub start_cmd {
     $r;
 }
 
+=head2 start_dde($app, $topic, $arg)
+
+Start a program via DDE. (What is $app and $topic?)
+
+=cut
+
 sub start_dde {
     my($app, $topic, $arg) = @_;
     my $r;
@@ -262,6 +335,14 @@ $app="Netscape";# geht nur mit Netscape und nicht mit "Netscape 4.0" - warum?
     };
     $r;
 }
+
+=head2 get_user_folder($foldertype, $public)
+
+Get the folder path for the current user, or, if $public is set to a
+true value, for the whole system. If $foldertype is not given, the
+"Personal" subfolder is returned.
+
+=cut
 
 sub get_user_folder {
     my($foldertype, $public) = @_;
@@ -282,6 +363,49 @@ sub get_user_folder {
     warn $@ if $@;
     $folder;
 }
+
+=head2 install_extension(%args)
+
+Install a new extension (class) to the registry. The function may take
+the following key-value parameters:
+
+=over 4
+
+=item -extension
+
+Required. The extension to be installed. The extension should start
+with a dot. This can also be an array reference to a number of
+extensions.
+
+=item -name
+
+Required. The class name of the new extension. May be something like
+Excel.Application.
+
+=item -icon
+
+The (full) path to a default icon file (format should be .ico).
+
+=item -open
+
+The default open command (used if the file is double-clicked in the
+explorer).
+
+=item -print
+
+The default print command.
+
+=item -desc
+
+An optional description.
+
+=item -mime
+
+The mime type of the extension (something like text/plain).
+
+=back
+
+=cut
 
 sub install_extension {
     my(%args) = @_;
@@ -341,8 +465,39 @@ sub install_extension {
     warn $@ if ($@);
 }
 
-# This is from Win32 FAQ
-# nicht ausgetestet, wegen mangels an MAPI (?)
+=head2 send_mail(%args)
+
+Send an email through MAPI. The following arguments are recognized:
+
+=over 4
+
+=item -sender
+
+Required. The sender who is sending the mail.
+
+=item -passwd
+
+The MAPI password (?)
+
+=item -recipient
+
+The recipient of the mail.
+
+=item -subject
+
+The subject of the message.
+
+=item -body
+
+The body text of the message.
+
+=back
+
+This is from Win32 FAQ. Not tested, because MAPI is not installed on
+my system.
+
+=cut
+
 sub send_mail {
     my(%args) = @_;
 
@@ -396,14 +551,38 @@ sub send_mail {
     1;
 }
 
-# Argumente:
-# -path: Pfad zum Programm (erforderlich)
-# -args: zusätzliche Argumente
-# -icon: Pfad zur .ico-Datei
-# -name: Titel des Programms (erforderlich)
-# -file: Pfad, wo die .lnk-Datei abgespeichert werden soll
-#        Wenn -file nicht angegeben ist, wird der Shortcut auf dem Desktop
-#        mit dem Filenamen -name .lnk abgespeichert.
+=head2 create_shortcut(%args)
+
+Create a shortcut (a desktop link). The following arguments are recognized:
+
+=over 4
+
+=item -path
+
+Path to program (required).
+
+=item -args
+
+Additional arguments for the program.
+
+=item -icon
+
+Path to the .ico icon file.
+
+=item -name
+
+Title of the program (required).
+
+=item -file
+
+Specify where to save the .lnk file. If -file is not given, the file
+will be stored on the current user desktop. The filename will consist
+of the -name parameter and the .lnk extension.
+
+=back
+
+=cut
+
 sub create_shortcut {
     my(%args) = @_;
     my $path  = delete $args{-path} || die "Missing -path parameter";
@@ -436,13 +615,32 @@ sub create_shortcut {
     warn $@ if ($@);
 }
 
-# Argumente:
-# -url: URL für den Shortcut (erforderlich)
-# -icon: Pfad zur .ico-Datei
-# -name: Titel des Programms (erforderlich)
-# -file: Pfad, wo die .url-Datei abgespeichert werden soll
-#        Wenn -file nicht angegeben ist, wird der Shortcut auf dem Desktop
-#        mit dem Filenamen -name .url abgespeichert.
+=head2 create_internet_shortcut(%args)
+
+Create an internet shortcut. The following arguments are recognized:
+
+=over 4
+
+=item -url
+
+URL for the shortcur (required).
+
+=item -icon
+
+Path to the .ico icon file.
+
+=item -name
+
+Title of the program (required).
+
+Specify where to save the .lnk file. If -file is not given, the file
+will be stored on the current user desktop. The filename will consist
+of the -url parameter and the .lnk extension.
+
+=back
+
+=cut
+
 sub create_internet_shortcut {
     my(%args) = @_;
     my $url   = delete $args{-url} || die "Missing -url parameter";
@@ -471,6 +669,12 @@ sub create_internet_shortcut {
     warn $@ if ($@);
 }
 
+=head2 add_recent_doc($doc)
+
+Add the specified document to the list of recent documents.
+
+=cut
+
 sub add_recent_doc {
     my $doc = shift;
     warn "try $doc";
@@ -485,10 +689,31 @@ sub add_recent_doc {
     warn $@ if $@;
 }
 
-# Argument -files:
-#   entweder nur ein Dateiname oder Array mit mehreren Dateinamen
-#   jeder Dateiname kann in der Form {-path => 'path', -name => 'name'} sein,
-#   wobei dieses Hash als Argument für create_shortcut verwendet wird.
+=head2 create_program_group(%args)
+
+Create a program group. Following arguments are recognized:
+
+=over 4
+
+=item -parent
+
+Required. The name of the new program group.
+
+=item -files
+
+Required. The files to be included into the new program group. The
+argument may be either a file name or an array with a number of file
+names. The file names can be either a string or a hash like {-path =>
+'path', -name => 'name'}. In the latter case, this hash will be used
+as an argument for create_shortcut.
+
+=item -public
+
+If true, create a program group in the public section, not in the user
+section of the start menu.
+
+=cut
+
 sub create_program_group {
     my(%args) = @_;
     my $parent = delete $args{-parent} or die "Missing -parent parameter";
@@ -526,6 +751,12 @@ sub create_program_group {
     warn $@ if $@;
 }
 
+=head2 get_cdrom_drives
+
+Return a list of CDROM drives on the system.
+
+=cut
+
 sub get_cdrom_drives {
     my @drives;
     eval q{
@@ -548,7 +779,12 @@ sub get_cdrom_drives {
     @drives;
 }
 
-# expand a normal absolute path to a UNC path
+=head2 path2unc($path)
+
+Expand a normal absolute path to a UNC path.
+
+=cut
+
 sub path2unc {
     my $path = shift;
     if ($path =~ m|^([a-z]):[/\\](.*)|i) {
@@ -576,7 +812,7 @@ use vars qw(%API_FUNC %API_DEF);
 				       In  => ["P"],
 				       Out => "I"},
 	   );
-	    
+
 sub _get_api_function {
     my $name = shift;
     eval {
@@ -594,8 +830,13 @@ sub _get_api_function {
     $API_FUNC{$name};
 }
 
-# Return maximum region for a window (without borders, title bar, taskbar
-# area).
+=head2 client_window_region($tk_window)
+
+Return maximum region for a window (without borders, title bar,
+taskbar area).
+
+=cut
+
 sub client_window_region {
     my $top = shift;
 
@@ -631,7 +872,12 @@ sub client_window_region {
     @extends;
 }
 
-# Return maximum screen size without taskbar area)
+=head2 screen_region($tk_window)
+
+Return maximum screen size without taskbar area.
+
+=cut
+
 sub screen_region {
     my $top = shift;
 
@@ -652,15 +898,26 @@ sub screen_region {
     @extends;
 }
 
-# Maximize the window. If Win32::API is installed, then the taskbar will not
-# be obscured.
+=head2 maximize($tk_window)
+
+Maximize the window. If Win32::API is installed, then the taskbar will
+not be obscured.
+
+=cut
+
 sub maximize {
     my $top = shift;
     my @extends = client_window_region($top);
     $top->geometry("$extends[2]x$extends[3]+$extends[0]+$extends[1]");
 }
 
-# "use locale" does not work on Windows. This is a hack...
+=head2 sort_cmp_hack($a,$b)
+
+"use locale" does not work on Windows. This is a hack to be used in
+sort for german umlauts.
+
+=cut
+
 sub sort_cmp_hack {
     my($s1, $s2) = @_;
     $s1 =~ tr/äöüß/aous/;
@@ -668,5 +925,23 @@ sub sort_cmp_hack {
     $s1 cmp $s2;
 }
 
-1;
+=head1 SEE ALSO
 
+L<perlwin32|perlwin32>, L<Win32::API|Win32::API>,
+L<Win32::OLE|Win32::OLE>, L<Win32::Registry|Win32::Registry>,
+L<Win32::Process|Win32::Process>, L<Win32::DDE|Win32::DDE>,
+L<Win32::Shortcut|Win32::Shortcut>, L<Tk|Tk>.
+
+=head1 AUTHOR
+
+Slaven Rezic <eserte@cs.tu-berlin.de>
+
+=head1 COPYRIGHT
+
+Copyright (c) 1999, 2000 Slaven Rezic. All rights reserved.
+This module is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.
+
+=cut
+
+1;
