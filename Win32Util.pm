@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 #
-# $Id: Win32Util.pm,v 1.27 2003/01/07 21:09:04 eserte Exp $
+# $Id: Win32Util.pm,v 1.28 2003/01/07 21:37:32 eserte Exp $
 # Author: Slaven Rezic
 #
 # Copyright (C) 1999-2003 Slaven Rezic. All rights reserved.
@@ -35,7 +35,7 @@ these modules are already bundled with the popular ActivePerl package.
 use strict;
 use vars qw($DEBUG $browser_ole_obj $VERSION);
 
-$VERSION = sprintf("%d.%02d", q$Revision: 1.27 $ =~ /(\d+)\.(\d+)/);
+$VERSION = sprintf("%d.%02d", q$Revision: 1.28 $ =~ /(\d+)\.(\d+)/);
 $DEBUG=0 unless defined $DEBUG;
 
 # XXX Win-Registry-Funktionen mit Hilfe von Win32::API und
@@ -331,6 +331,9 @@ sub start_cmd {
     eval q{
         use File::Basename;
         use Text::ParseWords;
+	# ENV var substitution:
+	my $env = normalize_env();
+        $fullcmd =~ s/%([^%]+)%/$env->{uc($1)}/g;
         my(@words) = parse_line('\s+', 1, $fullcmd);
         $appname = shift @words; $appname =~ s/\"//g;
         my $argstr = join(" ", @words);
@@ -344,7 +347,9 @@ sub start_cmd {
                 $cmdline .= " $args[$i]";
             }
         }
-        warn "start_cmd: " . $cmdline . "\n" if $DEBUG;
+	if ($DEBUG) {
+            warn "start_cmd: " . $cmdline . "\n(full path: $appname)\n";
+	}
     };
     warn $@ if $@;
 
@@ -360,6 +365,21 @@ sub start_cmd {
         $r = Win32::Spawn($appname, $cmdline, $pid);
     }
     $r;
+}
+
+=head2 normalize_env
+
+Return a hash reference with all environment variable names changed
+to uppercase.
+
+=cut
+
+sub normalize_env {
+    my %env;
+    while(my($k,$v) = each %ENV) {
+	$env{uc($k)} = $v;
+    }
+    \%env;
 }
 
 =head2 start_dde($app, $topic, $arg)
