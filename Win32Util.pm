@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 #
-# $Id: Win32Util.pm,v 1.26 2003/01/07 20:13:14 eserte Exp $
+# $Id: Win32Util.pm,v 1.27 2003/01/07 21:09:04 eserte Exp $
 # Author: Slaven Rezic
 #
 # Copyright (C) 1999-2003 Slaven Rezic. All rights reserved.
@@ -35,7 +35,7 @@ these modules are already bundled with the popular ActivePerl package.
 use strict;
 use vars qw($DEBUG $browser_ole_obj $VERSION);
 
-$VERSION = sprintf("%d.%02d", q$Revision: 1.26 $ =~ /(\d+)\.(\d+)/);
+$VERSION = sprintf("%d.%02d", q$Revision: 1.27 $ =~ /(\d+)\.(\d+)/);
 $DEBUG=0 unless defined $DEBUG;
 
 # XXX Win-Registry-Funktionen mit Hilfe von Win32::API und
@@ -213,6 +213,12 @@ sub start_ps_print_cmd {
     start_cmd($ps_print, $file);
 }
 
+sub start_txt_print {
+    my $file = shift;
+    my $txt_print = get_txt_print();
+    start_cmd($txt_print, $file);
+}
+
 sub start_html_viewer_dde {
     my $file = shift;
     my ($app, $topic) = get_html_viewer_dde();
@@ -258,6 +264,10 @@ sub get_ps_viewer {
 }
 sub get_ps_print {
     my $class = get_class_by_ext(".ps") || "psfile";
+    get_reg_cmd($class, "print");
+}
+sub get_txt_print {
+    my $class = get_class_by_ext(".txt") || "txtfile";
     get_reg_cmd($class, "print");
 }
 sub get_mail_composer {
@@ -1076,7 +1086,6 @@ sub create_shortcut {
 	    if (!defined $dir) {
 		die "Can't get Desktop or Startup directory";
 	    }
-warn $dir."\n";
 	    $file = join('\\\\', $dir, "$name.lnk");
 	}
 
