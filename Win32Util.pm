@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 #
-# $Id: Win32Util.pm,v 1.22 2001/06/13 22:29:51 eserte Exp $
+# $Id: Win32Util.pm,v 1.23 2002/02/11 18:04:23 eserte Exp $
 # Author: Slaven Rezic
 #
 # Copyright (C) 1999, 2000, 2001 Slaven Rezic. All rights reserved.
@@ -35,7 +35,7 @@ these modules are already bundled with the popular ActivePerl package.
 use strict;
 use vars qw($DEBUG $browser_ole_obj $VERSION);
 
-$VERSION = sprintf("%d.%02d", q$Revision: 1.22 $ =~ /(\d+)\.(\d+)/);
+$VERSION = sprintf("%d.%02d", q$Revision: 1.23 $ =~ /(\d+)\.(\d+)/);
 $DEBUG=0 unless defined $DEBUG;
 
 # XXX Win-Registry-Funktionen mit Hilfe von Win32::API und
@@ -499,7 +499,46 @@ sub install_extension {
     warn $@ if ($@);
 }
 
-=head2 write_uninstall_information
+=head2 write_uninstall_information(%args)
+
+=over 4
+
+=item -appname => $appname
+
+The application name. This is required.
+
+=item -uninstallstring => $string
+
+The command for the uninstall process (???). is required.
+
+=item -regowner => $owner
+
+Current owner of the registry entry (???). If not specified, the
+current user is used.
+
+=item -version => $version
+
+Version number of application. This should consist of a major and
+minor number. The full application name will be created of C<$appname>
+and C<$version>.
+
+=item -installdate => "YYYY-MM-DD"
+
+The date of installation. If not specified, the current date is used.
+
+=item -installlocation => $string
+
+=item -installsource => $string
+
+=item -modifypath => $string
+
+=item -publisher => $string
+
+=item -urlinfoabout => $string
+
+=item -urlupdateinfo => $string
+
+=back
 
 =cut
 
