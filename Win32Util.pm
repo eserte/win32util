@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 #
-# $Id: Win32Util.pm,v 1.29 2003/01/30 14:30:22 eserte Exp $
+# $Id: Win32Util.pm,v 1.30 2003/01/30 14:34:52 eserte Exp $
 # Author: Slaven Rezic
 #
 # Copyright (C) 1999-2003 Slaven Rezic. All rights reserved.
@@ -35,7 +35,7 @@ these modules are already bundled with the popular ActivePerl package.
 use strict;
 use vars qw($DEBUG $browser_ole_obj $VERSION);
 
-$VERSION = sprintf("%d.%02d", q$Revision: 1.29 $ =~ /(\d+)\.(\d+)/);
+$VERSION = sprintf("%d.%02d", q$Revision: 1.30 $ =~ /(\d+)\.(\d+)/);
 $DEBUG=0 unless defined $DEBUG;
 
 # XXX Win-Registry-Funktionen mit Hilfe von Win32::API und
@@ -1463,6 +1463,12 @@ sub maximize {
 =head2 get_sys_color($what)
 
 Return ($r,$g,$b) values from 0 to 255 for the requested system color.
+C<$what> is any of: scrollbar, background, activecaption,
+inactivecaption, menu, window, windowframe, menutext, windowtext,
+captiontext, activeborder, inactiveborder, appworkspace, highlight,
+highlighttext, btnface, btnshadow, graytext, btntext,
+inactivecaptiontext, btnhighlight, 3ddkshadow, 3dlight, infotext,
+infobk.
 
 =cut
 
@@ -1545,11 +1551,11 @@ sub disable_dosbox_close_button {
     }
 }
 
-=head2 keep_on_top($mw [, $flag])
+=head2 keep_on_top($tk_window [, $flag])
 
-Keep the window C<$mw> on top. If C<Win32::API> is not available, then
-a crude hack with a <Visibility> binding is used instead. If the
-optional variable C<$flag> is false, "keep on top" is disabled.
+Keep the window C<$tk_window> on top. If C<Win32::API> is not
+available, a crude hack with a <Visibility> binding is used instead.
+If the optional variable C<$flag> is false, "keep on top" is disabled.
 
 =cut
 
