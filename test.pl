@@ -9,7 +9,7 @@
 BEGIN { $| = 1; print "1..1\n"; }
 END {print "not ok 1\n" unless $loaded;}
 BEGIN {
-    if ($^O eq 'MSWin32') {
+    if ($^O eq 'MSWin32' || $^O eq 'cygwin') {
 	eval 'use Win32Util;';
 	die $@ if $@;
     } else {
@@ -86,12 +86,14 @@ if ($testall) {
     if (0) {
 	start_ps_viewer('C:\ghost\gs4.03\tiger.ps');
 	start_html_viewer('c:\users\slaven\bbbike-devel\bbbike.html');
-	start_mail_composer('mailto:eserte@onlineoffice.de');
+	start_mail_composer('mailto:slaven.rezic@berlin.de');
 	send_mail(-sender => 'eserte@cs.tu-berlin.de',
 		  -recipient => 'eserte@192.168.1.1',
 		  -subject => 'Eine Test-Mail mit MAPI',
 		  -body => "jfirejreg  ger\ngfhuefheirgre\nTest 1.2.3.4.....\n\ngruss slaven\n");
     }
+    warn "Disable DOS box close button\n";
+    Win32Util::disable_dosbox_close_button();
 }
 
 eval {
@@ -107,6 +109,21 @@ eval {
     Win32Util::maximize($mw);
     #$mw->update;
     $mw->after(1000, sub { $mw->destroy });
+    Tk::MainLoop();
+};
+
+eval {
+    require Tk;
+    my $mw = MainWindow->new;
+    my $l = $mw->Label(-text => "Keep on top")->pack;
+    Win32Util::keep_on_top($mw, 1);
+    $mw->after(2000, sub {
+	$l->configure(-text => "Do not keep on top anymore");
+	Win32Util::keep_on_top($mw, 0);
+	$mw->after(2000, sub {
+	    $mw->destroy;
+	});
+    });
     Tk::MainLoop();
 };
 
