@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 #
-# $Id: Win32Util.pm,v 1.32 2004/01/11 12:37:44 eserte Exp $
+# $Id: Win32Util.pm,v 1.33 2004/04/13 22:41:56 eserte Exp $
 # Author: Slaven Rezic
 #
 # Copyright (C) 1999-2004 Slaven Rezic. All rights reserved.
@@ -35,7 +35,7 @@ these modules are already bundled with the popular ActivePerl package.
 use strict;
 use vars qw($DEBUG $browser_ole_obj $VERSION);
 
-$VERSION = sprintf("%d.%02d", q$Revision: 1.32 $ =~ /(\d+)\.(\d+)/);
+$VERSION = sprintf("%d.%02d", q$Revision: 1.33 $ =~ /(\d+)\.(\d+)/);
 $DEBUG=0 unless defined $DEBUG;
 
 # XXX Win-Registry-Funktionen mit Hilfe von Win32::API und
@@ -1561,8 +1561,9 @@ sub disable_dosbox_close_button {
 =head2 keep_on_top($tk_window [, $flag])
 
 Keep the window C<$tk_window> on top. If C<Win32::API> is not
-available, a crude hack with a <Visibility> binding is used instead.
-If the optional variable C<$flag> is false, "keep on top" is disabled.
+available, attributes(-topmost) is used if Tk 804.027 is available,
+otherwise a crude hack with a <Visibility> binding is used instead. If
+the optional variable C<$flag> is false, "keep on top" is disabled.
 
 =cut
 
@@ -1593,6 +1594,8 @@ sub keep_on_top {
 	} else {
 	    $callAPI->($HWND_NOTOPMOST);
 	}
+    } elsif ($Tk::VERSION >= 804.027) {
+	$mw->attributes(-topmost => $flag); # XXX test this!
     } else {
 	warn "No Win32::API available, visibility binding hack";
 	my $stay_above_after;
