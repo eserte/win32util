@@ -111,22 +111,33 @@ sub get_reg_cmd {
 
 sub start_cmd {
     my($fullcmd, @args) = @_;
-    my $r;
+
+    my($appname, $base, $cmdline);
     eval q{
-        use Win32::Process;
         use File::Basename;
         use Text::ParseWords;
         my(@words) = parse_line('\s+', 1, $fullcmd);
-        my $appname = shift @words; $appname =~ s/\"//g;
+        $appname = shift @words; $appname =~ s/\"//g;
         my $argstr = join(" ", @words);
-        my $base = basename($appname); $base =~ s/\"//g;
-        my $cmdline = $base;
+        $base = basename($appname); $base =~ s/\"//g;
+        $cmdline = $base;
         $argstr =~ s/(%(\d))/ defined($args[$2-1]) ? $args[$2-1] : "" /eg;
         $cmdline .= " $argstr";
         warn "start_cmd: " . $cmdline . "\n" if $DEBUG;
+    };
+    warn $@ if $@;
+    
+    my $r;
+    eval q{
+        use Win32::Process;
         my $proc;
         $r = Win32::Process::Create($proc, $appname, $cmdline, 0, NORMAL_PRIORITY_CLASS, ".");
     };
+    if ($@) { # try Win32::Spawn (built-in)
+        use Win32;
+        my $pid;
+        $r = Win32::Spawn($appname, $cmdline, $pid);
+    }
     $r;    
 }
 
@@ -163,6 +174,39 @@ sub get_user_folder {
     };
     warn $@ if $@;
     $folder;
+}
+
+sub install_extension {
+    my(%args) = @_;
+    my $ext  = $args{-extension} or die "Missing -extension parameter";
+    if ($ext !~ /^\./) {
+	warn "Extension $ext does not start with dot";
+    }
+    my $name = $args{-name} or die "Missing -name parameter";
+    my $icon = $args{-icon};
+    my $open = $args{-open};
+    eval q{
+	use Win32::Registry;
+	my $ext_reg;
+	$main::HKEY_CLASSES_ROOT->Create($extension, \$ext_reg);
+	$ext_reg->SetValue("", $name);
+	my $name_reg;
+	$main::HKEY_CLASSES_ROOT->Create($name, \$name_reg);
+	if (defined $icon) {
+	    my $icon_reg;
+	    $name_reg->Create("DefaultIcon", \$icon_reg);
+	    $icon_reg->SetValue("", $icon);
+	}
+	if (defined $open) {
+	    my $shell_reg;
+	    $name_reg->Create("shell", \$shell_reg);
+	    my $open_reg;
+	    $shell_reg->Create("open", \$open_reg);
+	    my $command_reg;
+	    $open_reg->Create("command", \$command_reg);
+	    $command_reg->SetValue("", $open);
+	}
+    };
 }
 
 1;
