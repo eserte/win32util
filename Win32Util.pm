@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 #
-# $Id: Win32Util.pm,v 1.34 2004/10/19 19:27:36 eserte Exp $
+# $Id: Win32Util.pm,v 1.35 2005/07/02 22:32:21 eserte Exp $
 # Author: Slaven Rezic
 #
 # Copyright (C) 1999-2004 Slaven Rezic. All rights reserved.
@@ -35,7 +35,7 @@ these modules are already bundled with the popular ActivePerl package.
 use strict;
 use vars qw($DEBUG $browser_ole_obj $VERSION);
 
-$VERSION = sprintf("%d.%02d", q$Revision: 1.34 $ =~ /(\d+)\.(\d+)/);
+$VERSION = sprintf("%d.%02d", q$Revision: 1.35 $ =~ /(\d+)\.(\d+)/);
 $DEBUG=0 unless defined $DEBUG;
 
 # XXX Win-Registry-Funktionen mit Hilfe von Win32::API und
@@ -357,6 +357,13 @@ spawned, that is, executed in the background.
 
 =cut
 
+# XXX I got a report where for a print command the shell command
+# was as follows:
+#     %SystemRoot%\system32\Notepad.exe/p %1
+# Note that there is no space between exe and /p!
+# The user was unable to print, but the editor popped up.
+# Was it only a typo by the user when reporting, or
+# is it really this problem?
 sub start_cmd {
     my($fullcmd, @args) = @_;
 
@@ -1483,7 +1490,7 @@ sub maximize {
     my $showwindow = _get_api_function("ShowWindow");
     if (defined $showwindow) {
         my $SW_SHOWMAXIMIZED = 3;
-	warn $showwindow->Call(hex($top->frame), $SW_SHOWMAXIMIZED);
+	$showwindow->Call(hex($top->frame), $SW_SHOWMAXIMIZED);
     } else {
 	my @extends = client_window_region($top);
 	$top->geometry("$extends[2]x$extends[3]+$extends[0]+$extends[1]");
