@@ -86,7 +86,7 @@ if ($testall) {
     if (0) {
 	start_ps_viewer('C:\ghost\gs4.03\tiger.ps');
 	start_html_viewer('c:\users\slaven\bbbike-devel\bbbike.html');
-	start_mail_composer('mailto:slaven.rezic@berlin.de');
+	start_mail_composer('mailto:slaven@rezic.de');
 	send_mail(-sender => 'eserte@cs.tu-berlin.de',
 		  -recipient => 'eserte@192.168.1.1',
 		  -subject => 'Eine Test-Mail mit MAPI',
