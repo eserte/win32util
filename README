@@ -1,0 +1,13 @@
+Win32Util
+---------
+
+This is a collection of Win32 related functions. There are no strict
+prerequirements for this module, however, full functionality can only
+be achieved if some CPAN modules (Win32::Registry, Win32::API,
+Win32::DDE, Win32::Shortcut ...) are available. By default, most of
+these modules are already bundled with the popular ActivePerl package.
+
+To install:
+
+   perl Makefile.PL
+   nmake all test install
