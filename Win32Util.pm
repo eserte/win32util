@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 #
-# $Id: Win32Util.pm,v 1.35 2005/07/02 22:32:21 eserte Exp $
+# $Id: Win32Util.pm,v 1.36 2006/01/12 21:58:37 eserte Exp $
 # Author: Slaven Rezic
 #
 # Copyright (C) 1999-2004 Slaven Rezic. All rights reserved.
@@ -35,7 +35,7 @@ these modules are already bundled with the popular ActivePerl package.
 use strict;
 use vars qw($DEBUG $browser_ole_obj $VERSION);
 
-$VERSION = sprintf("%d.%02d", q$Revision: 1.35 $ =~ /(\d+)\.(\d+)/);
+$VERSION = sprintf("%d.%02d", q$Revision: 1.36 $ =~ /(\d+)\.(\d+)/);
 $DEBUG=0 unless defined $DEBUG;
 
 # XXX Win-Registry-Funktionen mit Hilfe von Win32::API und
@@ -888,7 +888,7 @@ sub get_special_folder {
 
 =head2 get_home_dir()
 
-Get home directory (from domain server) or the $HOME variable.
+Get home directory (from domain server) or from some environment variables.
 
 =cut
 
@@ -905,7 +905,11 @@ sub get_home_dir {
 	}
     }
 
-    $ENV{HOMESHARE} || $ENV{HOME};
+    if (exists $ENV{HOMEDRIVE} && exists $ENV{HOMEPATH}) {
+	return "$ENV{HOMEDRIVE}$ENV{HOMEPATH}";
+    }
+
+    $ENV{USERPROFILE} || $ENV{HOMESHARE} || $ENV{HOME};
 }
 
 
@@ -1566,7 +1570,7 @@ sub close_dosbox {
 
 As the function name says :-). Derived from a posting from Jack D.
 
-NOT YET TESTED!
+Tested by Peter Arnhold.
 
 =cut
 
@@ -1576,6 +1580,10 @@ sub disable_dosbox_close_button {
     # Get DOS window handle..
     my $hWnd = Win32::GUI::GetPerlWindow();
     die "Can't get perl window" if !$hWnd;
+    for (qw(GetSystemMenu GetMenuItemCount GetMenuItemID
+	    RemoveMenu DrawMenuBar)) {       
+	return if !defined _get_api_function($_);
+    }
     # Get System menu associated with IE Window handle..
     my $hMenu = $API_FUNC{GetSystemMenu}->Call($hWnd, 0);
     if ($hMenu) {
@@ -1753,3 +1761,33 @@ Win 3.x.
 
 You could also code your own small extension to call the
 GetWindowsDirectory() API. 
+
+----------------------------------------------------------------
+
+Aus perldoc Win32::Clipboard
+Zitat:
+bitmap (CF_DIB)
+
+The clipboard contains an image, either a bitmap or a picture copied in the clipboard from a graphic application. The data you get is a binary buffer ready to be written to a bitmap (BMP format) file.
+
+Example:
+
+$image = Win32::Clipboard::GetBitmap();
+open BITMAP, ">some.bmp";
+binmode BITMAP;
+print BITMAP $image;
+close BITMAP;
+
+Schreib es in eine temporäre Datei und ruf dann sowas wie
+system "mspaint -p some.bmp"
+auf.
+Das Kommando druckt bei mir (unter WinXPpro) die Datei direkt auf den Standarddrucker.
+
+http://board.perl-community.de/cgi-bin/ikonboard/ikonboard.cgi?act=ST;f=12;st=0;t=108;#idx3
+
+HKEY_CURRENT_USER\Control Panel\International\sLanguage
+
+DEU=Deutschland
+ENG=Grossbritanien
+
+(vielleicht fuer Msg.pm verwenden)
