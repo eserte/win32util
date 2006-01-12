@@ -3,3 +3,4 @@ MANIFEST
 Makefile.PL
 Win32Util.pm
 test.pl
+README
