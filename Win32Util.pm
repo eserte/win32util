@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 #
-# $Id: Win32Util.pm,v 1.37 2006/12/05 21:49:53 eserte Exp $
+# $Id: Win32Util.pm,v 1.38 2007/04/08 18:33:12 eserte Exp $
 # Author: Slaven Rezic
 #
 # Copyright (C) 1999-2004 Slaven Rezic. All rights reserved.
@@ -35,7 +35,7 @@ these modules are already bundled with the popular ActivePerl package.
 use strict;
 use vars qw($DEBUG $browser_ole_obj $VERSION);
 
-$VERSION = sprintf("%d.%02d", q$Revision: 1.37 $ =~ /(\d+)\.(\d+)/);
+$VERSION = sprintf("%d.%02d", q$Revision: 1.38 $ =~ /(\d+)\.(\d+)/);
 $DEBUG=0 unless defined $DEBUG;
 
 # XXX Win-Registry-Funktionen mit Hilfe von Win32::API und
@@ -1682,7 +1682,7 @@ sub sort_cmp_hack {
 
 sub sort_cmp_hack_transform {
     my $s = shift;
-    $s =~ tr/äöüß/aous/;
+    $s =~ tr/äöüßÄÖÜ/aousAOU/;
     $s;
 }
 
