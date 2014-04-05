@@ -99,18 +99,21 @@ use vars qw(%API_FUNC %API_DEF);
 
 sub _get_api_function {
     my $name = shift;
-    eval {
-	require Win32::API;
-	if (!exists $API_FUNC{$name}) {
+    if (!exists $API_FUNC{$name}) {
+	eval {
+	    require Win32::API;
 	    my $def = $API_DEF{$name};
 	    if (!$def) {
 		die "No API definition for $name";
 	    }
 	    $API_FUNC{$name} = new Win32::API ($def->{Lib}, $name,
 					       $def->{In}, $def->{Out});
+	};
+	if ($@) {
+	    warn $@;
+	    $API_FUNC{$name} = undef;
 	}
-    };
-    warn $@ if $@;
+    }
     $API_FUNC{$name};
 }
 
