@@ -1,99 +1,127 @@
-# Before `make install' is performed this script should be runnable with
-# `make test'. After `make install' it should work as `perl test.pl'
+use strict;
+use Getopt::Long;
+use Test::More;
 
-######################### We start with some black magic to print on failure.
-
-# Change 1..1 below to 1..last_test_to_print .
-# (It may become useful if the test is moved to ./t subdirectory.)
-
-BEGIN { $| = 1; print "1..1\n"; }
-END {print "not ok 1\n" unless $loaded;}
 BEGIN {
-    if ($^O eq 'MSWin32' || $^O eq 'cygwin') {
-	eval 'use Win32Util;';
-	die $@ if $@;
-    } else {
-	# skip all tests
-	print "ok 1\n";
-	$loaded = 1;
+    if (!($^O eq 'MSWin32' || $^O eq 'cygwin')) {
+	plan skip_all => 'Tests only meaningful on a Windows system';
 	exit;
     }
 }
 
-$loaded = 1;
-print "ok 1\n";
+plan 'no_plan';
 
-use Getopt::Long;
+use_ok 'Win32Util';
+
 my $testall;
-GetOptions("testall!" => \$testall);
+GetOptions(
+	   "debug|d" => sub { $Win32Util::DEBUG = 1 },
+	   "testall" => \$testall,
+	  )
+    or die "usage?";
 
-######################### End of black magic.
+{
+    my @activecaption_color = Win32Util::get_sys_color("activecaption");
+    ok "@activecaption_color", "Got activecaption color: @activecaption_color";
+}
 
-# Insert your test code below (better if it prints "ok 13"
-# (correspondingly "not ok 13") depending on the success of chunk 13
-# of the test code):
+for my $type (qw(Programs Desktop)) {
+    my $user_folder = Win32Util::get_user_folder($type, 1);
+    ok $user_folder, "Got user folder for '$type': $user_folder";
+}
 
-#warn join(", ", Win32Util::get_sys_color("activecaption"));
-#warn Win32Util::get_user_folder("Programs", 1);
-#warn Win32Util::get_user_folder("Desktop", 1);
-#warn Win32Util::get_user_name();
-use LWP::UserAgent;my $ua = new LWP::UserAgent;
-$Win32Util::DEBUG = 1;
-Win32Util::lwp_auto_proxy($ua);
+{
+    my $user_name = Win32Util::get_user_name();
+    ok $user_name, "Got user name: $user_name";
+}
 
-if ($testall) {
+SKIP: {
+    skip "No LWP available", 1
+	if !eval { require LWP::UserAgent; 1 };
+    my $ua = new LWP::UserAgent;
+    Win32Util::lwp_auto_proxy($ua);
+    pass "Called lwp_auto_proxy";
+}
 
-    package Win32Util;
+foreach my $folder_type (qw(
+			       DESKTOP
+			       PROGRAMS
+			       PERSONAL
+			       FAVORITES
+			       STARTUP
+			       RECENT
+			       SENDTO
+			       STARTMENU
+			       DESKTOPDIRECTORY
+			       NETHOOD
+			       FONTS
+			       TEMPLATES
+			       COMMON_STARTMENU
+			       COMMON_PROGRAMS
+			       COMMON_STARTUP
+			       COMMON_DESKTOPDIRECTORY
+			       APPDATA
+			       PRINTHOOD
+			       PROGRAM_FILES_COMMON
+			  )) {
+    my $val = Win32Util::get_special_folder($folder_type);
+    ok $val, "Special folder '$folder_type': $val";
+}
 
+eval {
+    Win32Util::get_special_folder('THIS_TYPE_DOES_NOT_EXIST');
+};
+like $@, qr{Folder type must be one of}, 'Non-existent special folder type';;
+
+for my $def (
+	     ['Postscript viewer', sub { Win32Util::get_ps_viewer() }, 1],
+	     ['User folder', sub { Win32Util::get_user_folder() }],
+	     ['Public program folder', sub { Win32Util::get_program_folder() }],
+	     ['Public program start menu folder', sub { Win32Util::get_user_folder("Programs", 1) }],
+	     ['All drives', sub { join(", ", Win32Util::get_drives()) }],
+	     ['Net drives', sub { join(", ", Win32Util::get_drives('remote')) }, 1],
+	     ['Fixed drives', sub { join(", ", Win32Util::get_drives('fixed')) }, 1],
+	     ['Removable drives', sub { join(", ", Win32Util::get_drives('removable')) }, 1],
+	     ['CDROM drives', sub { join(", ", Win32Util::get_drives("cdrom")) }, 1],
+	     ['CDROM drives (via get_cdrom_drives())', sub { join(", ", Win32Util::get_cdrom_drives()) }, 1],
+	    ) {
+    my($label, $code, $optional) = @$def;
+    my $val = $code->();
+    if ($optional && !defined $val) {
+	diag "$label: <nothing available>";
+    } else {
+	ok $val, "$label: $val";
+    }
+}    
+
+if (0) {
     #*start_html_viewer = \&start_html_viewer_dde;
     #*start_html_viewer = \&start_html_viewer_cmd;
     #*start_ps_viewer = \&start_ps_viewer_cmd;
     #*start_ps_print = \&start_ps_print_cmd;
+    start_ps_viewer('C:\ghost\gs4.03\tiger.ps');
+    start_html_viewer('c:\users\slaven\bbbike-devel\bbbike.html');
+    start_mail_composer('mailto:slaven@rezic.de');
+    send_mail(-sender => 'eserte@cs.tu-berlin.de',
+	      -recipient => 'eserte@192.168.1.1',
+	      -subject => 'Eine Test-Mail mit MAPI',
+	      -body => "jfirejreg  ger\ngfhuefheirgre\nTest 1.2.3.4.....\n\ngruss slaven\n");
+}
 
-    foreach my $folder_type (qw(DESKTOP
-				PROGRAMS
-				PERSONAL
-				FAVORITES
-				STARTUP
-				RECENT
-				SENDTO
-				STARTMENU
-				DESKTOPDIRECTORY
-				NETHOOD
-				FONTS
-				TEMPLATES
-				COMMON_STARTMENU
-				COMMON_PROGRAMS
-				COMMON_STARTUP
-				COMMON_DESKTOPDIRECTORY
-				APPDATA
-				PRINTHOOD
-				PROGRAM_FILES_COMMON
-			       )) {
-	warn "Folder type $folder_type: " . get_special_folder($folder_type) . "\n";
+if ($testall) {
+    eval {
+	Win32Util::disable_dosbox_close_button();
+    };
+    if ($@) {
+	if ($@ =~ m{Can't locate}) {
+	    diag "Prerequisites missing: $@";
+	} else {
+	    fail "disable_dosbox_close_button test";
+	    diag $@;
+	}
+    } else {
+	pass "disable_dosbox_close_button test";
     }
-
-    warn "Postscript viewer: " . get_ps_viewer() . "\n";
-    warn "User folder: " . get_user_folder() . "\n";
-    warn "Public program folder: " . get_program_folder() . "\n";
-    warn "Public program start menu folder: " . get_user_folder("Programs", 1) . "\n";
-    warn "All drives: " . join(", ", get_drives()) . "\n";
-    warn "Net drives: " . join(", ", get_drives('remote')) . "\n";
-    warn "Fixed drives: " . join(", ", get_drives('fixed')) . "\n";
-    warn "Removable drives: " . join(", ", get_drives('removable')) . "\n";
-    warn "CDROM drives: " . join(", ", get_drives("cdrom")) . "\n";
-    warn "CDROM drives: " . join(", ", get_cdrom_drives()) . "\n";
-    if (0) {
-	start_ps_viewer('C:\ghost\gs4.03\tiger.ps');
-	start_html_viewer('c:\users\slaven\bbbike-devel\bbbike.html');
-	start_mail_composer('mailto:slaven@rezic.de');
-	send_mail(-sender => 'eserte@cs.tu-berlin.de',
-		  -recipient => 'eserte@192.168.1.1',
-		  -subject => 'Eine Test-Mail mit MAPI',
-		  -body => "jfirejreg  ger\ngfhuefheirgre\nTest 1.2.3.4.....\n\ngruss slaven\n");
-    }
-    warn "Disable DOS box close button\n";
-    Win32Util::disable_dosbox_close_button();
 }
 
 eval {
