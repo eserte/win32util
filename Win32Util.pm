@@ -724,14 +724,14 @@ sub get_user_name {
 	}
     }
 
-    _get_api_function("GetUserName");
-    if (!$API_FUNC{GetUserName}) {
+    my $GetUserName = _get_api_function("GetUserName");
+    if (!$GetUserName) {
 	return Win32::LoginName();
     }
     my $max = 256;
     my $maxb = pack("L", $max);
     my $login = "\0"x$max;
-    my $b = $API_FUNC{GetUserName}->Call($login, $maxb);
+    my $b = $GetUserName->Call($login, $maxb);
     if ($b) {
 	substr($login, 0, unpack("L", $maxb)-1);
     } else {
@@ -1593,9 +1593,9 @@ sub get_sys_color {
     };
     my $number = $name2number->{$type};
     return unless defined $number;
-    _get_api_function("GetSysColor");
-    return unless $API_FUNC{GetSysColor};
-    my $i = $API_FUNC{GetSysColor}->Call($number);
+    my $GetSysColor = _get_api_function("GetSysColor");
+    return unless $GetSysColor;
+    my $i = $GetSysColor->Call($number);
     my($r,$g,$b);
     $b = $i >> 16;
     $g = ($i >> 8) & 0xff;
